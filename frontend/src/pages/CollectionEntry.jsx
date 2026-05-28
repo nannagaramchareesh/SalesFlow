@@ -793,7 +793,7 @@ const CollectionEntry = () => {
                                   </span>
                                 </div>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                                  {new Date(inv.dateOfInvoice || inv.date).toLocaleDateString()} | Brand: <strong>{inv.brand || '-'}</strong> | Belt: <strong>{inv.belt || '-'}</strong>
+                                  Brand: <strong>{inv.brand || '-'}</strong> | Belt: <strong>{inv.belt || '-'}</strong>
                                 </div>
                               </div>
                             </div>
@@ -801,7 +801,7 @@ const CollectionEntry = () => {
                             {/* Stats Grid */}
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', background: '#f8fafc', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.8rem' }}>
                               <div>
-                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Bill Value</div>
+                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Invoice Value</div>
                                 <div style={{ fontWeight: 600, color: 'var(--primary-color)', fontSize: '0.9rem', marginTop: '0.1rem' }}>₹{value.toLocaleString()}</div>
                               </div>
                               <div>
@@ -809,13 +809,25 @@ const CollectionEntry = () => {
                                 <div style={{ fontWeight: 700, color: balance > 0 ? '#b91c1c' : '#15803d', fontSize: '0.9rem', marginTop: '0.1rem' }}>₹{balance.toLocaleString()}</div>
                               </div>
                               <div>
-                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Received</div>
+                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Total Received</div>
                                 <div style={{ fontWeight: 600, color: '#0369a1', fontSize: '0.9rem', marginTop: '0.1rem' }}>₹{totalReceived.toLocaleString()}</div>
                               </div>
                               <div>
                                 <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Overdue Days</div>
                                 <div style={{ fontWeight: 700, color: overdue > 0 && inv.status !== 'Paid' ? '#b91c1c' : '#64748b', fontSize: '0.9rem', marginTop: '0.1rem' }}>
                                   {inv.status === 'Paid' ? 0 : overdue} Days
+                                </div>
+                              </div>
+                              <div>
+                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Invoice Date</div>
+                                <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.85rem', marginTop: '0.1rem' }}>
+                                  {new Date(inv.dateOfInvoice || inv.date).toLocaleDateString()}
+                                </div>
+                              </div>
+                              <div>
+                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Brand / Belt</div>
+                                <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.85rem', marginTop: '0.1rem' }}>
+                                  {inv.brand || '-'} / {inv.belt || '-'}
                                 </div>
                               </div>
                             </div>
