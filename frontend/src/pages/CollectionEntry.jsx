@@ -787,7 +787,7 @@ const CollectionEntry = () => {
                               />
                               <div style={{ flex: 1 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary-color)' }}>{inv.invoiceNumber}</span>
+                                  <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary-color)' }}>Invoice No: {inv.invoiceNumber}</span>
                                   <span className={`badge badge-${inv.status === 'Paid' ? 'success' : inv.status === 'Partial' ? 'warning' : 'danger'}`} style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem' }}>
                                     {inv.status}
                                   </span>
@@ -990,18 +990,18 @@ const CollectionEntry = () => {
                     <div key={idx} className="timeline-item">
                       <div className="timeline-marker"></div>
                       <div className="timeline-content-card" style={p.isBounced ? { border: '1px solid #fee2e2', background: '#fef2f2' } : {}}>
-                        <div className="timeline-item-meta">
-                          <span className="timeline-item-date">
-                            {new Date(p.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                        <div className="timeline-item-meta" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', width: '100%' }}>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                            Payment Date: <strong style={{ color: 'var(--text-primary)' }}>{new Date(p.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</strong>
                             {p.isBounced && (
                               <span className="badge badge-danger" style={{ marginLeft: '0.5rem', fontSize: '0.65rem', padding: '0.1rem 0.4rem' }}>
                                 Bounced
                               </span>
                             )}
-                          </span>
-                          <span className="timeline-item-amount" style={p.isBounced ? { textDecoration: 'line-through', color: '#ef4444' } : {}}>
-                            + ₹{p.amount.toLocaleString()}
-                          </span>
+                          </div>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                            Paid Amount: <span style={p.isBounced ? { textDecoration: 'line-through', color: '#ef4444' } : { color: '#10b981' }}>₹{p.amount.toLocaleString()}</span>
+                          </div>
                         </div>
                         <div className="timeline-item-details">
                           <div className="timeline-detail-col">
