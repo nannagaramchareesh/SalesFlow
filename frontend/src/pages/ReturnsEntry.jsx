@@ -568,49 +568,61 @@ const ReturnsEntry = () => {
                         >
                           {/* Card Header */}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                            <div>
-                              <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary-color)' }}>{invoice.invoiceNumber}</span>
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                                {new Date(invoice.dateOfInvoice || invoice.date).toLocaleDateString()}
-                              </div>
-                            </div>
-                            <span className={`badge badge-${invoice.status === 'Paid' ? 'success' : invoice.status === 'Partial' ? 'warning' : 'danger'}`} style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem' }}>
-                              {invoice.status}
-                            </span>
-                          </div>
+                             <div>
+                               <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary-color)' }}>Invoice No: {invoice.invoiceNumber}</span>
+                               <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                                 Brand: <strong>{invoice.brand || '-'}</strong> | Belt: <strong>{invoice.belt || '-'}</strong>
+                               </div>
+                             </div>
+                             <span className={`badge badge-${invoice.status === 'Paid' ? 'success' : invoice.status === 'Partial' ? 'warning' : 'danger'}`} style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem' }}>
+                               {invoice.status}
+                             </span>
+                           </div>
 
-                          {/* Stats Grid */}
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', background: '#f8fafc', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
-                            <div>
-                              <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Bill Value</div>
-                              <div style={{ fontWeight: 600, color: 'var(--primary-color)', fontSize: '0.9rem', marginTop: '0.1rem' }}>₹{value.toLocaleString()}</div>
-                            </div>
-                            <div>
-                              <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Balance</div>
-                              <div style={{ fontWeight: 700, color: balance > 0 ? '#b91c1c' : '#15803d', fontSize: '0.9rem', marginTop: '0.1rem' }}>₹{balance.toLocaleString()}</div>
-                            </div>
-                            <div>
-                              <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Received</div>
-                              <div style={{ fontWeight: 600, color: '#0369a1', fontSize: '0.9rem', marginTop: '0.1rem' }}>₹{totalReceived.toLocaleString()}</div>
-                            </div>
-                            <div>
-                              <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Cheques</div>
-                              <div style={{ marginTop: '0.1rem' }}>
-                                {chequePayments.length > 0 ? (
-                                  <button
-                                    type="button"
-                                    className="btn btn-secondary"
-                                    onClick={() => setActiveChequesInvoice(invoice)}
-                                    style={{ padding: '0.15rem 0.45rem', fontSize: '0.7rem', fontWeight: 600 }}
-                                  >
-                                    View ({chequePayments.length})
-                                  </button>
-                                ) : (
-                                  <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>N/A</span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
+                           {/* Stats Grid */}
+                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', background: '#f8fafc', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
+                             <div>
+                               <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Invoice Value</div>
+                               <div style={{ fontWeight: 600, color: 'var(--primary-color)', fontSize: '0.9rem', marginTop: '0.1rem' }}>₹{value.toLocaleString()}</div>
+                             </div>
+                             <div>
+                               <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Balance</div>
+                               <div style={{ fontWeight: 700, color: balance > 0 ? '#b91c1c' : '#15803d', fontSize: '0.9rem', marginTop: '0.1rem' }}>₹{balance.toLocaleString()}</div>
+                             </div>
+                             <div>
+                               <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Total Received</div>
+                               <div style={{ fontWeight: 600, color: '#0369a1', fontSize: '0.9rem', marginTop: '0.1rem' }}>₹{totalReceived.toLocaleString()}</div>
+                             </div>
+                             <div>
+                               <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Cheques</div>
+                               <div style={{ marginTop: '0.1rem' }}>
+                                 {chequePayments.length > 0 ? (
+                                   <button
+                                     type="button"
+                                     className="btn btn-secondary"
+                                     onClick={() => setActiveChequesInvoice(invoice)}
+                                     style={{ padding: '0.15rem 0.45rem', fontSize: '0.7rem', fontWeight: 600 }}
+                                   >
+                                     View ({chequePayments.length})
+                                   </button>
+                                 ) : (
+                                   <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>N/A</span>
+                                 )}
+                               </div>
+                             </div>
+                             <div>
+                               <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Invoice Date</div>
+                               <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.85rem', marginTop: '0.1rem' }}>
+                                 {new Date(invoice.dateOfInvoice || invoice.date).toLocaleDateString()}
+                                </div>
+                             </div>
+                             <div>
+                               <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Brand / Belt</div>
+                               <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.85rem', marginTop: '0.1rem' }}>
+                                 {invoice.brand || '-'} / {invoice.belt || '-'}
+                               </div>
+                             </div>
+                           </div>
 
                           {/* Action Row */}
                           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
@@ -773,19 +785,19 @@ const ReturnsEntry = () => {
                       <div key={idx} className="timeline-item">
                         <div className="timeline-marker"></div>
                         <div className="timeline-content-card" style={p.isBounced ? { border: '1px solid #fee2e2', background: '#fef2f2' } : {}}>
-                          <div className="timeline-item-meta">
-                            <span className="timeline-item-date">
-                              {new Date(p.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
-                              {p.isBounced && (
-                                <span className="badge badge-danger" style={{ marginLeft: '0.5rem', fontSize: '0.65rem', padding: '0.1rem 0.4rem' }}>
-                                  Bounced
-                                </span>
-                              )}
-                            </span>
-                            <span className="timeline-item-amount" style={p.isBounced ? { textDecoration: 'line-through', color: '#ef4444' } : {}}>
-                              ₹{p.amount.toLocaleString()}
-                            </span>
-                          </div>
+                          <div className="timeline-item-meta" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', width: '100%' }}>
+                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                               Payment Date: <strong style={{ color: 'var(--text-primary)' }}>{new Date(p.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</strong>
+                               {p.isBounced && (
+                                 <span className="badge badge-danger" style={{ marginLeft: '0.5rem', fontSize: '0.65rem', padding: '0.1rem 0.4rem' }}>
+                                   Bounced
+                                 </span>
+                               )}
+                             </div>
+                             <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                               Paid Amount: <span style={p.isBounced ? { textDecoration: 'line-through', color: '#ef4444' } : { color: '#10b981' }}>₹{p.amount.toLocaleString()}</span>
+                             </div>
+                           </div>
                           <div className="timeline-item-details">
                             <div className="timeline-detail-col">
                               <span className="timeline-detail-label">Instrument</span>
