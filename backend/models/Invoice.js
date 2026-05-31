@@ -5,10 +5,13 @@ const invoiceSchema = mongoose.Schema(
     invoiceNumber: { type: String, required: true, unique: true },
     dealerName: { type: String, required: true },
     dateOfInvoice: { type: Date, required: true, default: Date.now },
+    invoiceValueBeforeTax: { type: Number, required: false },
     invoiceValue: { type: Number, required: true },
     balance: { type: Number, required: true },
     brand: { type: String, required: false },
     belt: { type: String, required: false },
+    salesTeam: { type: String, required: false },
+    invoiceImage: { type: String },
     status: { type: String, required: true, default: 'Unpaid' }, // Unpaid, Partial, Paid
     chequeReturnAmount: { type: Number, default: 0 },
     chequeReturnDate: { type: Date },

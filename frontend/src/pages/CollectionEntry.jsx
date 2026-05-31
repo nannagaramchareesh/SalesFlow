@@ -10,6 +10,7 @@ const CollectionEntry = () => {
 
   // Form states per invoice row
   const [paymentForms, setPaymentForms] = useState({});
+  const [zoomedImageUrl, setZoomedImageUrl] = useState(null);
 
   // Dealer view filters
   const [dealerSearch, setDealerSearch] = useState('');
@@ -615,7 +616,8 @@ const CollectionEntry = () => {
                         <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, background: '#f0fdfa' }}>Cheque Number</th>
                         <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, background: '#f0fdfa' }}>Cheque Date</th>
                         
-                        {/* Static Belt Column */}
+                        {/* Static Sales Team & Belt Columns */}
+                        <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600 }}>Sales Team</th>
                         <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600 }}>Belt</th>
                         
                         <th style={{ padding: '1rem', textAlign: 'center', fontWeight: 600, background: '#f0fdfa' }}>Action</th>
@@ -624,7 +626,7 @@ const CollectionEntry = () => {
                     <tbody>
                       {filteredInvoices.length === 0 ? (
                         <tr>
-                          <td colSpan="18" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                          <td colSpan="19" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
                             <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔍</div>
                             <div>No bills match your filter criteria.</div>
                           </td>
@@ -658,8 +660,29 @@ const CollectionEntry = () => {
                               </div>
                             </td>
                             
-                            {/* Static Info Columns */}
-                            <td style={{ padding: '1rem', fontWeight: 600 }}>{inv.invoiceNumber}</td>
+                            <td style={{ padding: '1rem', fontWeight: 600 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span>{inv.invoiceNumber}</span>
+                                {inv.invoiceImage && (
+                                  <button 
+                                    type="button" 
+                                    onClick={() => setZoomedImageUrl(inv.invoiceImage)}
+                                    style={{ 
+                                      background: 'none', 
+                                      border: 'none', 
+                                      padding: 0, 
+                                      cursor: 'pointer', 
+                                      fontSize: '1.1rem',
+                                      display: 'inline-flex',
+                                      alignItems: 'center'
+                                    }} 
+                                    title="View Hard Copy"
+                                  >
+                                    📷
+                                  </button>
+                                )}
+                              </div>
+                            </td>
                             <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 500 }}>₹{value.toLocaleString()}</td>
                             <td style={{ padding: '1rem', textAlign: 'center' }}>
                               <span style={{ color: overdue > 0 && inv.status !== 'Paid' ? '#b91c1c' : '#64748b', fontWeight: 600 }}>
@@ -717,7 +740,8 @@ const CollectionEntry = () => {
                                   <input type="date" className="form-input" disabled={form.paymentMode !== 'Cheque' && form.instrument !== 'Cheque'} style={{ padding: '0.4rem', fontSize: '0.8rem', minWidth: '130px', opacity: (form.paymentMode !== 'Cheque' && form.instrument !== 'Cheque') ? 0.5 : 1 }} value={form.chequeDate || ''} onChange={e => handlePaymentChange(inv._id, 'chequeDate', e.target.value)} />
                                 </td>
                                 
-                                {/* Belt column at the end of inputs */}
+                                {/* Sales Team & Belt columns at the end of inputs */}
+                                <td style={{ padding: '1rem' }}>{inv.salesTeam || '-'}</td>
                                 <td style={{ padding: '1rem' }}>{inv.belt || '-'}</td>
                                 
                                 <td style={{ padding: '0.5rem', textAlign: 'center' }}>
@@ -735,6 +759,7 @@ const CollectionEntry = () => {
                                 <td colSpan="6" style={{ padding: '1rem', textAlign: 'center', color: '#15803d', fontWeight: 600, background: '#f0fdfa' }}>
                                   Fully Paid
                                 </td>
+                                <td style={{ padding: '1rem' }}>{inv.salesTeam || '-'}</td>
                                 <td style={{ padding: '1rem' }}>{inv.belt || '-'}</td>
                                 <td style={{ padding: '1rem', textAlign: 'center', background: '#f0fdfa' }}>
                                   -
@@ -787,13 +812,33 @@ const CollectionEntry = () => {
                               />
                               <div style={{ flex: 1 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary-color)' }}>Invoice No: {inv.invoiceNumber}</span>
+                                  <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary-color)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                                    Invoice No: {inv.invoiceNumber}
+                                    {inv.invoiceImage && (
+                                      <button 
+                                        type="button" 
+                                        onClick={() => setZoomedImageUrl(inv.invoiceImage)}
+                                        style={{ 
+                                          background: 'none', 
+                                          border: 'none', 
+                                          padding: 0, 
+                                          cursor: 'pointer', 
+                                          fontSize: '1rem',
+                                          display: 'inline-flex',
+                                          alignItems: 'center'
+                                        }}
+                                        title="View Hard Copy"
+                                      >
+                                        📷
+                                      </button>
+                                    )}
+                                  </span>
                                   <span className={`badge badge-${inv.status === 'Paid' ? 'success' : inv.status === 'Partial' ? 'warning' : 'danger'}`} style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem' }}>
                                     {inv.status}
                                   </span>
                                 </div>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                                  Brand: <strong>{inv.brand || '-'}</strong> | Belt: <strong>{inv.belt || '-'}</strong>
+                                  Brand: <strong>{inv.brand || '-'}</strong> | Sales Team: <strong>{inv.salesTeam || '-'}</strong> | Belt: <strong>{inv.belt || '-'}</strong>
                                 </div>
                               </div>
                             </div>
@@ -825,9 +870,9 @@ const CollectionEntry = () => {
                                 </div>
                               </div>
                               <div>
-                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Brand / Belt</div>
+                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Sales Team / Brand / Belt</div>
                                 <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.85rem', marginTop: '0.1rem' }}>
-                                  {inv.brand || '-'} / {inv.belt || '-'}
+                                  {inv.salesTeam || '-'} / {inv.brand || '-'} / {inv.belt || '-'}
                                 </div>
                               </div>
                             </div>
@@ -1044,6 +1089,53 @@ const CollectionEntry = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {zoomedImageUrl && (
+        <div 
+          onClick={() => setZoomedImageUrl(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(15, 23, 42, 0.9)',
+            zIndex: 1000,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            cursor: 'zoom-out',
+            padding: '2rem'
+          }}
+        >
+          <img 
+            src={zoomedImageUrl} 
+            alt="Invoice hard copy Zoomed" 
+            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}
+          />
+          <button 
+            onClick={() => setZoomedImageUrl(null)}
+            style={{
+              position: 'absolute',
+              top: '1.5rem',
+              right: '1.5rem',
+              background: 'white',
+              border: 'none',
+              borderRadius: '50%',
+              width: '40px',
+              height: '40px',
+              cursor: 'pointer',
+              fontSize: '1.25rem',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+            }}
+          >
+            ✕
+          </button>
         </div>
       )}
     </div>

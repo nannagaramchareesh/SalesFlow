@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, FileText, IndianRupee, RotateCcw } from 'lucide-react';
+import { LayoutDashboard, FileText, IndianRupee, RotateCcw, Camera, Users } from 'lucide-react';
 import './Sidebar.css';
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
@@ -29,6 +29,14 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
           <NavLink to="/returns" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
             <RotateCcw size={20} />
             <span>Returns</span>
+          </NavLink>
+          <NavLink to="/invoice-image" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
+            <Camera size={20} />
+            <span>Invoice Image</span>
+          </NavLink>
+          <NavLink to="/dealers" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
+            <Users size={20} />
+            <span>Dealers Master</span>
           </NavLink>
         </nav>
       </aside>

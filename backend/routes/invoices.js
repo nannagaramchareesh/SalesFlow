@@ -23,6 +23,30 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Bulk create invoices
+router.post('/bulk', async (req, res) => {
+  try {
+    if (!Array.isArray(req.body)) {
+      return res.status(400).json({ message: 'Request body must be an array' });
+    }
+    
+    // Using ordered: false so that if some invoices fail (e.g. duplicates), the rest are still saved.
+    const newInvoices = await Invoice.insertMany(req.body, { ordered: false });
+    res.status(201).json(newInvoices);
+  } catch (err) {
+    if (err.name === 'BulkWriteError' || err.writeErrors) {
+      const insertedCount = err.result ? err.result.nInserted : 0;
+      res.status(207).json({
+        message: 'Some invoices failed to insert (possibly duplicates).',
+        insertedCount,
+        errors: (err.writeErrors || []).map(e => e.errmsg)
+      });
+    } else {
+      res.status(400).json({ message: err.message });
+    }
+  }
+});
+
 // Update an invoice
 router.put('/:id', async (req, res) => {
   try {

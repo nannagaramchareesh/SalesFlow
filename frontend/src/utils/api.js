@@ -1,12 +1,13 @@
 import axios from 'axios';
+import { getDealerDetails } from './dealers';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 // Fallback Mock Data
 let mockInvoices = [
-  { _id: '1', invoiceNumber: 'INV-1001', dealerName: 'Acme Corp', invoiceValue: 15000, balance: 15000, brand: 'Nike', belt: 'Leather', status: 'Unpaid', dateOfInvoice: '2026-05-10T10:00:00Z' },
-  { _id: '2', invoiceNumber: 'INV-1002', dealerName: 'TechFlow Solutions', invoiceValue: 8500, balance: 0, brand: 'Adidas', belt: 'Nylon', status: 'Paid', dateOfInvoice: '2026-05-12T14:30:00Z' },
-  { _id: '3', invoiceNumber: 'INV-1003', dealerName: 'Global Industries', invoiceValue: 24000, balance: 12000, brand: 'Puma', belt: 'Canvas', status: 'Partial', dateOfInvoice: '2026-05-14T09:15:00Z' },
+  { _id: '1', invoiceNumber: 'INV-1001', dealerName: 'Acme Corp', invoiceValueBeforeTax: 12711.86, invoiceValue: 15000, balance: 15000, brand: 'Nike', belt: 'Leather', salesTeam: 'North Sales Team', status: 'Unpaid', dateOfInvoice: '2026-05-10T10:00:00Z' },
+  { _id: '2', invoiceNumber: 'INV-1002', dealerName: 'TechFlow Solutions', invoiceValueBeforeTax: 7203.39, invoiceValue: 8500, balance: 0, brand: 'Adidas', belt: 'Nylon', salesTeam: 'East Sales Team', status: 'Paid', dateOfInvoice: '2026-05-12T14:30:00Z' },
+  { _id: '3', invoiceNumber: 'INV-1003', dealerName: 'Global Industries', invoiceValueBeforeTax: 20338.98, invoiceValue: 24000, balance: 12000, brand: 'Puma', belt: 'Canvas', salesTeam: 'South Sales Team', status: 'Partial', dateOfInvoice: '2026-05-14T09:15:00Z' },
 ];
 
 let mockCollections = [
@@ -34,6 +35,44 @@ export const createInvoice = async (data) => {
     const newInv = { ...data, _id: Date.now().toString(), status: 'Unpaid', dateOfInvoice: data.dateOfInvoice || new Date().toISOString() };
     mockInvoices.unshift(newInv);
     return newInv;
+  }
+};
+
+export const createBulkInvoices = async (dataList) => {
+  try {
+    const res = await axios.post(`${API_URL}/invoices/bulk`, dataList);
+    return res.data;
+  } catch (error) {
+    const newInvoices = dataList.map((inv, idx) => {
+      const brand = inv.invoiceNumber && inv.invoiceNumber.includes('-') ? inv.invoiceNumber.split('-')[0].trim() : '';
+      const invoiceVal = Number(inv.invoiceValue) || 0;
+      const dealerDetail = getDealerDetails(inv.dealerName);
+      const belt = inv.belt || (dealerDetail ? dealerDetail.belt : '');
+      const salesTeam = inv.salesTeam || (dealerDetail ? dealerDetail.salesTeam : '');
+      return {
+        ...inv,
+        _id: (Date.now() + idx).toString(),
+        brand,
+        belt,
+        salesTeam,
+        invoiceValueBeforeTax: Number(inv.invoiceValueBeforeTax) || 0,
+        invoiceValue: invoiceVal,
+        balance: invoiceVal,
+        status: 'Unpaid',
+        dateOfInvoice: inv.dateOfInvoice || new Date().toISOString(),
+        partPayments: []
+      };
+    });
+    const uniqueNew = newInvoices.filter(newInv => !mockInvoices.some(existing => existing.invoiceNumber === newInv.invoiceNumber));
+    mockInvoices = [...uniqueNew, ...mockInvoices];
+    if (uniqueNew.length < newInvoices.length) {
+      return {
+        message: 'Some invoices failed to insert (possibly duplicates).',
+        insertedCount: uniqueNew.length,
+        errors: ['Duplicate invoice numbers found in mock database.']
+      };
+    }
+    return uniqueNew;
   }
 };
 
@@ -187,5 +226,35 @@ export const updateInvoiceReturns = async (id, returnData) => {
       return inv;
     }
     throw new Error('Invoice not found');
+  }
+};
+
+export const getDealers = async () => {
+  try {
+    const res = await axios.get(`${API_URL}/dealers`);
+    return res.data;
+  } catch (error) {
+    console.warn("Backend unavailable, using static dealers list");
+    return [];
+  }
+};
+
+export const createDealer = async (data) => {
+  try {
+    const res = await axios.post(`${API_URL}/dealers`, data);
+    return res.data;
+  } catch (error) {
+    console.error("Error creating dealer:", error);
+    throw error;
+  }
+};
+
+export const deleteDealer = async (id) => {
+  try {
+    const res = await axios.delete(`${API_URL}/dealers/${id}`);
+    return res.data;
+  } catch (error) {
+    console.error("Error deleting dealer:", error);
+    throw error;
   }
 };

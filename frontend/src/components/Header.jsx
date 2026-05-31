@@ -1,4 +1,4 @@
-import { Search, Bell, User, Menu } from 'lucide-react';
+import { Bell, User, Menu } from 'lucide-react';
 import './Header.css';
 
 const Header = ({ toggleSidebar }) => {
@@ -7,10 +7,6 @@ const Header = ({ toggleSidebar }) => {
       <button className="hamburger-btn" onClick={toggleSidebar}>
         <Menu size={24} />
       </button>
-      <div className="header-search">
-        <Search size={20} className="search-icon" />
-        <input type="text" placeholder="Search dealers, invoices..." className="search-input" />
-      </div>
       <div className="header-actions">
         <button className="action-btn">
           <Bell size={20} />
