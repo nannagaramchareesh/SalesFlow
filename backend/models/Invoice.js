@@ -9,6 +9,7 @@ const invoiceSchema = mongoose.Schema(
     invoiceValue: { type: Number, required: true },
     balance: { type: Number, required: true },
     brand: { type: String, required: false },
+    month: { type: String, required: false },
     belt: { type: String, required: false },
     salesTeam: { type: String, required: false },
     invoiceImage: { type: String },
@@ -38,11 +39,30 @@ invoiceSchema.pre('validate', function() {
     this.brand = this.invoiceNumber.split('-')[0].trim();
   }
 
-  // Calculate Total Received
-  const totalReceived = (this.partPayments || []).reduce((sum, p) => sum + p.amount, 0);
+  // Auto-extract month from dateOfInvoice
+  if (this.dateOfInvoice) {
+    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    const dateObj = new Date(this.dateOfInvoice);
+    if (!isNaN(dateObj.getTime())) {
+      this.month = months[dateObj.getMonth()];
+    }
+  }
 
-  // Calculate Outstanding Balance
-  let calculatedBalance = this.invoiceValue - totalReceived + (this.chequeReturnAmount || 0) - (this.srCrValue || 0);
+  // Calculate Total Received (excluding bounced payments)
+  const totalReceived = (this.partPayments || [])
+    .filter(p => !p.isBounced)
+    .reduce((sum, p) => sum + p.amount, 0);
+
+  // Calculate sum of bounced payments
+  const bouncedReceived = (this.partPayments || [])
+    .filter(p => p.isBounced)
+    .reduce((sum, p) => sum + p.amount, 0);
+
+  // Custom returned amount (excluding bounced cheques)
+  const customReturn = Math.max(0, (this.chequeReturnAmount || 0) - bouncedReceived);
+
+  // Calculate Outstanding Balance (add back the customReturn charges/fees, subtract non-bounced payments and credits)
+  let calculatedBalance = this.invoiceValue - totalReceived - (this.srCrValue || 0) + customReturn;
   if (calculatedBalance < 0) calculatedBalance = 0;
   
   this.balance = calculatedBalance;

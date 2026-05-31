@@ -32,7 +32,17 @@ export const createInvoice = async (data) => {
     const res = await axios.post(`${API_URL}/invoices`, data);
     return res.data;
   } catch (error) {
-    const newInv = { ...data, _id: Date.now().toString(), status: 'Unpaid', dateOfInvoice: data.dateOfInvoice || new Date().toISOString() };
+    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    const dateVal = data.dateOfInvoice || new Date().toISOString();
+    const dateObj = new Date(dateVal);
+    const month = !isNaN(dateObj.getTime()) ? months[dateObj.getMonth()] : '';
+    const newInv = { 
+      ...data, 
+      _id: Date.now().toString(), 
+      status: 'Unpaid', 
+      dateOfInvoice: dateVal,
+      month: data.month || month
+    };
     mockInvoices.unshift(newInv);
     return newInv;
   }
@@ -49,17 +59,24 @@ export const createBulkInvoices = async (dataList) => {
       const dealerDetail = getDealerDetails(inv.dealerName);
       const belt = inv.belt || (dealerDetail ? dealerDetail.belt : '');
       const salesTeam = inv.salesTeam || (dealerDetail ? dealerDetail.salesTeam : '');
+      
+      const dateVal = inv.dateOfInvoice || new Date().toISOString();
+      const dateObj = new Date(dateVal);
+      const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+      const month = !isNaN(dateObj.getTime()) ? months[dateObj.getMonth()] : '';
+
       return {
         ...inv,
         _id: (Date.now() + idx).toString(),
         brand,
+        month,
         belt,
         salesTeam,
         invoiceValueBeforeTax: Number(inv.invoiceValueBeforeTax) || 0,
         invoiceValue: invoiceVal,
         balance: invoiceVal,
         status: 'Unpaid',
-        dateOfInvoice: inv.dateOfInvoice || new Date().toISOString(),
+        dateOfInvoice: dateVal,
         partPayments: []
       };
     });
@@ -213,13 +230,22 @@ export const updateInvoiceReturns = async (id, returnData) => {
       if (returnData.srNumber) inv.srNumber = returnData.srNumber;
       if (returnData.srDate) inv.srDate = returnData.srDate;
       
-      const totalPayments = (inv.partPayments || []).reduce((sum, p) => sum + p.amount, 0);
-      let newBalance = inv.invoiceValue - totalPayments + inv.chequeReturnAmount - inv.srCrValue;
+      const totalReceived = (inv.partPayments || [])
+        .filter(p => !p.isBounced)
+        .reduce((sum, p) => sum + p.amount, 0);
+
+      const bouncedReceived = (inv.partPayments || [])
+        .filter(p => p.isBounced)
+        .reduce((sum, p) => sum + p.amount, 0);
+
+      const customReturn = Math.max(0, inv.chequeReturnAmount - bouncedReceived);
+
+      let newBalance = inv.invoiceValue - totalReceived - inv.srCrValue + customReturn;
       if (newBalance < 0) newBalance = 0;
       inv.balance = newBalance;
       
       if (inv.balance === 0) inv.status = 'Paid';
-      else if (totalPayments > 0 || inv.srCrValue > 0) inv.status = 'Partial';
+      else if (totalReceived > 0 || inv.srCrValue > 0) inv.status = 'Partial';
       else inv.status = 'Unpaid';
       
       mockInvoices[index] = { ...inv };

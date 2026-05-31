@@ -216,7 +216,7 @@ router.get('/', async (req, res) => {
 
 // Create a new dealer
 router.post('/', async (req, res) => {
-  const { name, salesTeam, belt } = req.body;
+  const { name, salesTeam, belt, contactNumber } = req.body;
   if (!name || !salesTeam || !belt) {
     return res.status(400).json({ message: 'All fields (name, salesTeam, belt) are required.' });
   }
@@ -231,7 +231,8 @@ router.post('/', async (req, res) => {
     const newDealer = new Dealer({
       name: name.trim(),
       salesTeam: salesTeam.trim(),
-      belt: belt.trim()
+      belt: belt.trim(),
+      contactNumber: contactNumber ? contactNumber.trim() : ''
     });
 
     const saved = await newDealer.save();

@@ -4,6 +4,14 @@ import { getInvoices, createInvoice, updateInvoice, deleteInvoice, createBulkInv
 import { calculateOverdueDays, calculateTotalReceived, calculateDealerTotalOutstanding, countOverdueBills } from '../utils/formulas';
 import { DEALERS_LIST, getDealerDetails } from '../utils/dealers';
 
+const getMonthAbbreviation = (dateStr) => {
+  if (!dateStr) return '';
+  const dateObj = new Date(dateStr);
+  if (isNaN(dateObj.getTime())) return '';
+  const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  return months[dateObj.getMonth()];
+};
+
 const DataEntry = () => {
   const [invoices, setInvoices] = useState([]);
   const [editingId, setEditingId] = useState(null);
@@ -19,6 +27,7 @@ const DataEntry = () => {
   const initialFormState = {
     invoiceNumber: '',
     brand: '',
+    month: getMonthAbbreviation(new Date().toISOString().split('T')[0]),
     dealerName: '',
     dateOfInvoice: new Date().toISOString().split('T')[0],
     invoiceValueBeforeTax: '',
@@ -84,11 +93,13 @@ const DataEntry = () => {
   const handleEdit = (inv) => {
     const isPredefined = dealersList.some(d => d.name.toLowerCase() === inv.dealerName.toLowerCase());
     setEditingId(inv._id);
+    const dateStr = new Date(inv.dateOfInvoice || inv.date).toISOString().split('T')[0];
     setFormData({
       invoiceNumber: inv.invoiceNumber,
       brand: inv.brand || '',
+      month: inv.month || getMonthAbbreviation(dateStr),
       dealerName: inv.dealerName,
-      dateOfInvoice: new Date(inv.dateOfInvoice || inv.date).toISOString().split('T')[0],
+      dateOfInvoice: dateStr,
       invoiceValueBeforeTax: inv.invoiceValueBeforeTax !== undefined ? inv.invoiceValueBeforeTax : '',
       invoiceValue: inv.invoiceValue || inv.amount || 0,
       belt: inv.belt || '',
@@ -542,7 +553,31 @@ const DataEntry = () => {
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.25rem', display: 'block' }}>Date of Invoice</label>
-              <input type="date" className="form-input" value={formData.dateOfInvoice} onChange={e => setFormData({ ...formData, dateOfInvoice: e.target.value })} required />
+              <input
+                type="date"
+                className="form-input"
+                value={formData.dateOfInvoice}
+                onChange={e => {
+                  const val = e.target.value;
+                  setFormData(prev => ({
+                    ...prev,
+                    dateOfInvoice: val,
+                    month: getMonthAbbreviation(val)
+                  }));
+                }}
+                required
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.25rem', display: 'block' }}>Month</label>
+              <input
+                type="text"
+                className="form-input"
+                value={formData.month || ''}
+                readOnly
+                style={{ backgroundColor: '#e2e8f0', color: '#475569', cursor: 'not-allowed' }}
+                placeholder="Auto-populated"
+              />
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.25rem', display: 'block' }}>Invoice Value Before Tax (₹)</label>
@@ -567,9 +602,10 @@ const DataEntry = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                <th style={{ padding: '1rem', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: 600 }}>Dealer Name</th>
                 <th style={{ padding: '1rem', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: 600 }}>Invoice Number</th>
                 <th style={{ padding: '1rem', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: 600 }}>Brand</th>
-                <th style={{ padding: '1rem', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: 600 }}>Dealer Name</th>
+                <th style={{ padding: '1rem', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: 600 }}>Month</th>
                 <th style={{ padding: '1rem', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: 600 }}>Sales Team</th>
                 <th style={{ padding: '1rem', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: 600 }}>Belt</th>
                 <th style={{ padding: '1rem', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: 600 }}>Date</th>
@@ -583,6 +619,7 @@ const DataEntry = () => {
                 const value = inv.invoiceValue || 0;
                 return (
                   <tr key={inv._id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.2s', ':hover': { backgroundColor: '#f8fafc' } }}>
+                    <td style={{ padding: '1rem', fontWeight: 500 }}>{inv.dealerName}</td>
                     <td style={{ padding: '1rem', fontWeight: 600 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <span>{inv.invoiceNumber}</span>
@@ -607,7 +644,7 @@ const DataEntry = () => {
                       </div>
                     </td>
                     <td style={{ padding: '1rem' }}>{inv.brand || 'No Brand'}</td>
-                    <td style={{ padding: '1rem', fontWeight: 500 }}>{inv.dealerName}</td>
+                    <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--primary-color)' }}>{inv.month || getMonthAbbreviation(inv.dateOfInvoice || inv.date)}</td>
                     <td style={{ padding: '1rem' }}>{inv.salesTeam || '-'}</td>
                     <td style={{ padding: '1rem' }}>{inv.belt || '-'}</td>
                     <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>{new Date(inv.dateOfInvoice || inv.date).toLocaleDateString()}</td>
@@ -624,7 +661,7 @@ const DataEntry = () => {
               })}
               {displayedInvoices.length === 0 && (
                 <tr>
-                  <td colSpan="9" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                  <td colSpan="10" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
                     <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>📄</div>
                     <div>No invoices found.</div>
                   </td>
@@ -652,7 +689,7 @@ const DataEntry = () => {
                     <div>
                       <div className="mobile-card-title">{inv.dealerName}</div>
                       <div className="mobile-card-subtitle">
-                        {inv.invoiceNumber} <span style={{ opacity: 0.7 }}>({inv.brand || 'No Brand'})</span>
+                        {inv.invoiceNumber} <span style={{ opacity: 0.7 }}>({inv.brand || 'No Brand'} - {inv.month || getMonthAbbreviation(inv.dateOfInvoice || inv.date)})</span>
                         {inv.invoiceImage && (
                           <button 
                             type="button" 

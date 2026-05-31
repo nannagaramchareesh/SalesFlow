@@ -21,7 +21,7 @@ export const calculateOverdueDays = (dateStr) => {
  */
 export const calculateTotalReceived = (invoice) => {
   if (!invoice || !invoice.partPayments) return 0;
-  return invoice.partPayments.reduce((sum, p) => sum + p.amount, 0);
+  return invoice.partPayments.filter(p => !p.isBounced).reduce((sum, p) => sum + p.amount, 0);
 };
 
 /**

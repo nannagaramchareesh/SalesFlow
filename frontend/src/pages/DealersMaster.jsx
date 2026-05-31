@@ -15,6 +15,7 @@ const DealersMaster = () => {
   const [customSalesTeam, setCustomSalesTeam] = useState('');
   const [belt, setBelt] = useState('FRI');
   const [customBelt, setCustomBelt] = useState('');
+  const [contactNumber, setContactNumber] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -60,13 +61,15 @@ const DealersMaster = () => {
     const payload = {
       name: name.trim(),
       salesTeam: finalSalesTeam,
-      belt: finalBelt
+      belt: finalBelt,
+      contactNumber: contactNumber.trim()
     };
 
     try {
       const result = await createDealer(payload);
       setSuccessMsg(`Dealer "${result.name}" added successfully!`);
       setName('');
+      setContactNumber('');
       if (salesTeam === 'custom') setCustomSalesTeam('');
       if (belt === 'custom') setCustomBelt('');
       loadDealers();
@@ -91,7 +94,8 @@ const DealersMaster = () => {
 
   // Filter logic
   const filteredDealers = dealers.filter(d => {
-    const matchesSearch = d.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (d.contactNumber && d.contactNumber.includes(searchQuery));
     const matchesTeam = teamFilter ? d.salesTeam === teamFilter : true;
     const matchesBelt = beltFilter ? d.belt === beltFilter : true;
     return matchesSearch && matchesTeam && matchesBelt;
@@ -129,6 +133,17 @@ const DealersMaster = () => {
                 onChange={e => setName(e.target.value)}
                 placeholder="Enter dealer name"
                 required
+              />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.25rem', display: 'block' }}>Contact Number</label>
+              <input
+                type="text"
+                className="form-input"
+                value={contactNumber}
+                onChange={e => setContactNumber(e.target.value)}
+                placeholder="Enter contact number"
               />
             </div>
 
@@ -255,6 +270,7 @@ const DealersMaster = () => {
                   <thead>
                     <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
                       <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: 600 }}>Dealer Name</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: 600 }}>Contact Number</th>
                       <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: 600 }}>Sales Team</th>
                       <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: 600 }}>Belt</th>
                       <th style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', fontWeight: 600 }}>Actions</th>
@@ -264,6 +280,7 @@ const DealersMaster = () => {
                     {filteredDealers.map(d => (
                       <tr key={d._id || d.name} style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>{d.name}</td>
+                        <td style={{ padding: '0.75rem 1rem' }}>{d.contactNumber || '-'}</td>
                         <td style={{ padding: '0.75rem 1rem' }}>
                           <span style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', background: d.salesTeam === 'Arvind' ? '#e0f2fe' : '#f0fdf4', color: d.salesTeam === 'Arvind' ? '#0369a1' : '#15803d', fontSize: '0.8rem', fontWeight: 600 }}>
                             {d.salesTeam}
@@ -285,7 +302,7 @@ const DealersMaster = () => {
                     ))}
                     {filteredDealers.length === 0 && (
                       <tr>
-                        <td colSpan="4" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                        <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
                           No dealers found.
                         </td>
                       </tr>
@@ -307,7 +324,7 @@ const DealersMaster = () => {
                         <div>
                           <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{d.name}</div>
                           <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                            Team: <strong>{d.salesTeam}</strong> | Belt: <strong>{d.belt}</strong>
+                            Team: <strong>{d.salesTeam}</strong> | Belt: <strong>{d.belt}</strong>{d.contactNumber ? ` | Contact: ${d.contactNumber}` : ''}
                           </div>
                         </div>
                         {d._id && (

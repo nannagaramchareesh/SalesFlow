@@ -22,6 +22,7 @@ const CollectionEntry = () => {
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState('all'); // all, Unpaid, Partial, Paid
   const [invoiceOverdueFilter, setInvoiceOverdueFilter] = useState('all'); // all, overdue, overdue_30, overdue_60, overdue_90, not_overdue
   const [invoiceBrandFilter, setInvoiceBrandFilter] = useState('all'); // all, or specific brand
+  const [invoiceOverdueSort, setInvoiceOverdueSort] = useState('none'); // none, asc, desc
   const [expandedPayments, setExpandedPayments] = useState({});
 
 
@@ -84,13 +85,19 @@ const CollectionEntry = () => {
       return;
     }
 
+    const selectedMode = form.paymentMode || 'RTGS';
+    let mode = 'Online';
+    if (selectedMode === 'Cash' || selectedMode === 'Cheque') {
+      mode = selectedMode;
+    }
+
     const paymentData = {
       amount: Number(form.amount),
       date: form.date || new Date().toISOString(),
-      paymentMode: form.paymentMode || 'Online',
-      instrument: form.instrument || 'RTGS',
-      chequeNumber: form.chequeNumber || '',
-      chequeDate: form.chequeDate || ''
+      paymentMode: mode,
+      instrument: selectedMode,
+      chequeNumber: selectedMode === 'Cheque' ? (form.chequeNumber || '') : '',
+      chequeDate: selectedMode === 'Cheque' ? (form.chequeDate || '') : ''
     };
 
     try {
@@ -346,7 +353,7 @@ const CollectionEntry = () => {
           // Dynamic unique brands for the current dealer's invoices
           const uniqueBrands = [...new Set(dealerInvoices.map(inv => inv.brand).filter(Boolean))];
 
-          const filteredInvoices = dealerInvoices.filter(inv => {
+          let filteredInvoices = dealerInvoices.filter(inv => {
             if (invoiceSearch && !inv.invoiceNumber.toLowerCase().includes(invoiceSearch.toLowerCase())) {
               return false;
             }
@@ -378,6 +385,20 @@ const CollectionEntry = () => {
 
             return true;
           });
+
+          if (invoiceOverdueSort === 'asc') {
+            filteredInvoices.sort((a, b) => {
+              const overdueA = a.status === 'Paid' ? 0 : calculateOverdueDays(a.dateOfInvoice || a.date);
+              const overdueB = b.status === 'Paid' ? 0 : calculateOverdueDays(b.dateOfInvoice || b.date);
+              return overdueA - overdueB;
+            });
+          } else if (invoiceOverdueSort === 'desc') {
+            filteredInvoices.sort((a, b) => {
+              const overdueA = a.status === 'Paid' ? 0 : calculateOverdueDays(a.dateOfInvoice || a.date);
+              const overdueB = b.status === 'Paid' ? 0 : calculateOverdueDays(b.dateOfInvoice || b.date);
+              return overdueB - overdueA;
+            });
+          }
 
           const totalOutstanding = calculateDealerTotalOutstanding(invoices, selectedDealer);
           const overdueCount = countOverdueBills(invoices, selectedDealer);
@@ -502,7 +523,7 @@ const CollectionEntry = () => {
                       <option value="not_overdue">Not Overdue</option>
                     </select>
                   </div>
-                  <div style={{ minWidth: '130px' }}>
+                   <div style={{ minWidth: '130px' }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Brand</label>
                     <select
                       className="form-input"
@@ -516,7 +537,20 @@ const CollectionEntry = () => {
                       ))}
                     </select>
                   </div>
-                  {(invoiceSearch || invoiceStatusFilter !== 'all' || invoiceOverdueFilter !== 'all' || invoiceBrandFilter !== 'all') && (
+                  <div style={{ minWidth: '150px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Sort Overdue</label>
+                    <select
+                      className="form-input"
+                      style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                      value={invoiceOverdueSort}
+                      onChange={e => setInvoiceOverdueSort(e.target.value)}
+                    >
+                      <option value="none">No Sort</option>
+                      <option value="asc">Low to High</option>
+                      <option value="desc">High to Low</option>
+                    </select>
+                  </div>
+                  {(invoiceSearch || invoiceStatusFilter !== 'all' || invoiceOverdueFilter !== 'all' || invoiceBrandFilter !== 'all' || invoiceOverdueSort !== 'none') && (
                     <button
                       className="btn btn-secondary"
                       style={{ fontSize: '0.8rem', alignSelf: 'flex-end', height: '36px', padding: '0 1rem', display: 'inline-flex', alignItems: 'center' }}
@@ -525,6 +559,7 @@ const CollectionEntry = () => {
                         setInvoiceStatusFilter('all');
                         setInvoiceOverdueFilter('all');
                         setInvoiceBrandFilter('all');
+                        setInvoiceOverdueSort('none');
                       }}
                     >
                       Reset
@@ -612,7 +647,6 @@ const CollectionEntry = () => {
                         <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, background: '#f0fdfa' }}>Received Date</th>
                         <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, background: '#f0fdfa' }}>Payment Mode</th>
                         <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, background: '#f0fdfa' }}>Received Amount</th>
-                        <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, background: '#f0fdfa' }}>RTGS/Cash/Cheque/GPay</th>
                         <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, background: '#f0fdfa' }}>Cheque Number</th>
                         <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, background: '#f0fdfa' }}>Cheque Date</th>
                         
@@ -626,7 +660,7 @@ const CollectionEntry = () => {
                     <tbody>
                       {filteredInvoices.length === 0 ? (
                         <tr>
-                          <td colSpan="19" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                          <td colSpan="18" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
                             <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔍</div>
                             <div>No bills match your filter criteria.</div>
                           </td>
@@ -715,29 +749,22 @@ const CollectionEntry = () => {
                                   <input type="date" className="form-input" style={{ padding: '0.4rem', fontSize: '0.8rem', minWidth: '130px' }} value={displayDate} onChange={e => handlePaymentChange(inv._id, 'date', e.target.value)} />
                                 </td>
                                 <td style={{ padding: '0.5rem' }}>
-                                  <select className="form-input" style={{ padding: '0.4rem', fontSize: '0.8rem', minWidth: '110px' }} value={form.paymentMode || 'Online'} onChange={e => handlePaymentChange(inv._id, 'paymentMode', e.target.value)}>
-                                    <option value="Online">Online</option>
+                                  <select className="form-input" style={{ padding: '0.4rem', fontSize: '0.8rem', minWidth: '110px' }} value={form.paymentMode || 'RTGS'} onChange={e => handlePaymentChange(inv._id, 'paymentMode', e.target.value)}>
                                     <option value="Cash">Cash</option>
+                                    <option value="RTGS">RTGS</option>
+                                    <option value="GPay">GPay</option>
+                                    <option value="Phone Pay">Phone Pay</option>
+                                    <option value="Cheque">Cheque</option>
                                   </select>
                                 </td>
                                 <td style={{ padding: '0.5rem' }}>
                                   <input type="number" placeholder="Amt (₹)" className="form-input" style={{ padding: '0.4rem', fontSize: '0.8rem', minWidth: '100px' }} value={form.amount || ''} onChange={e => handlePaymentChange(inv._id, 'amount', e.target.value)} />
                                 </td>
                                 <td style={{ padding: '0.5rem' }}>
-                                  <select className="form-input" style={{ padding: '0.4rem', fontSize: '0.8rem', minWidth: '110px' }} value={form.instrument || 'RTGS'} onChange={e => handlePaymentChange(inv._id, 'instrument', e.target.value)}>
-                                    <option value="RTGS">RTGS</option>
-                                    <option value="NEFT">NEFT</option>
-                                    <option value="UPI">UPI</option>
-                                    <option value="Cash">Cash</option>
-                                    <option value="Cheque">Cheque</option>
-                                    <option value="GPay">GPay</option>
-                                  </select>
+                                  <input type="text" placeholder="Chq No." className="form-input" disabled={form.paymentMode !== 'Cheque'} style={{ padding: '0.4rem', fontSize: '0.8rem', minWidth: '100px', opacity: form.paymentMode !== 'Cheque' ? 0.5 : 1 }} value={form.chequeNumber || ''} onChange={e => handlePaymentChange(inv._id, 'chequeNumber', e.target.value)} />
                                 </td>
                                 <td style={{ padding: '0.5rem' }}>
-                                  <input type="text" placeholder="Chq No." className="form-input" disabled={form.paymentMode !== 'Cheque' && form.instrument !== 'Cheque'} style={{ padding: '0.4rem', fontSize: '0.8rem', minWidth: '100px', opacity: (form.paymentMode !== 'Cheque' && form.instrument !== 'Cheque') ? 0.5 : 1 }} value={form.chequeNumber || ''} onChange={e => handlePaymentChange(inv._id, 'chequeNumber', e.target.value)} />
-                                </td>
-                                <td style={{ padding: '0.5rem' }}>
-                                  <input type="date" className="form-input" disabled={form.paymentMode !== 'Cheque' && form.instrument !== 'Cheque'} style={{ padding: '0.4rem', fontSize: '0.8rem', minWidth: '130px', opacity: (form.paymentMode !== 'Cheque' && form.instrument !== 'Cheque') ? 0.5 : 1 }} value={form.chequeDate || ''} onChange={e => handlePaymentChange(inv._id, 'chequeDate', e.target.value)} />
+                                  <input type="date" className="form-input" disabled={form.paymentMode !== 'Cheque'} style={{ padding: '0.4rem', fontSize: '0.8rem', minWidth: '130px', opacity: form.paymentMode !== 'Cheque' ? 0.5 : 1 }} value={form.chequeDate || ''} onChange={e => handlePaymentChange(inv._id, 'chequeDate', e.target.value)} />
                                 </td>
                                 
                                 {/* Sales Team & Belt columns at the end of inputs */}
@@ -756,7 +783,7 @@ const CollectionEntry = () => {
                               </>
                             ) : (
                               <>
-                                <td colSpan="6" style={{ padding: '1rem', textAlign: 'center', color: '#15803d', fontWeight: 600, background: '#f0fdfa' }}>
+                                <td colSpan="5" style={{ padding: '1rem', textAlign: 'center', color: '#15803d', fontWeight: 600, background: '#f0fdfa' }}>
                                   Fully Paid
                                 </td>
                                 <td style={{ padding: '1rem' }}>{inv.salesTeam || '-'}</td>
@@ -913,12 +940,15 @@ const CollectionEntry = () => {
                                     <input type="date" className="form-input" style={{ width: '100%', padding: '0.45rem' }} value={displayDate} onChange={e => handlePaymentChange(inv._id, 'date', e.target.value)} />
                                   </div>
 
-                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                     <div>
                                       <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Payment Mode</label>
-                                      <select className="form-input" style={{ width: '100%', padding: '0.45rem' }} value={form.paymentMode || 'Online'} onChange={e => handlePaymentChange(inv._id, 'paymentMode', e.target.value)}>
-                                        <option value="Online">Online</option>
+                                      <select className="form-input" style={{ width: '100%', padding: '0.45rem' }} value={form.paymentMode || 'RTGS'} onChange={e => handlePaymentChange(inv._id, 'paymentMode', e.target.value)}>
                                         <option value="Cash">Cash</option>
+                                        <option value="RTGS">RTGS</option>
+                                        <option value="GPay">GPay</option>
+                                        <option value="Phone Pay">Phone Pay</option>
+                                        <option value="Cheque">Cheque</option>
                                       </select>
                                     </div>
                                     <div>
@@ -927,19 +957,7 @@ const CollectionEntry = () => {
                                     </div>
                                   </div>
 
-                                  <div>
-                                    <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Instrument Type</label>
-                                    <select className="form-input" style={{ width: '100%', padding: '0.45rem' }} value={form.instrument || 'RTGS'} onChange={e => handlePaymentChange(inv._id, 'instrument', e.target.value)}>
-                                      <option value="RTGS">RTGS</option>
-                                      <option value="NEFT">NEFT</option>
-                                      <option value="UPI">UPI</option>
-                                      <option value="Cash">Cash</option>
-                                      <option value="Cheque">Cheque</option>
-                                      <option value="GPay">GPay</option>
-                                    </select>
-                                  </div>
-
-                                  {(form.paymentMode === 'Cheque' || form.instrument === 'Cheque') && (
+                                  {form.paymentMode === 'Cheque' && (
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                                       <div>
                                         <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Cheque Number</label>
