@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { IndianRupee, FileText, TrendingUp, AlertCircle } from 'lucide-react';
 import { getInvoices, getCollections } from '../utils/api';
 import { calculateDealerTotalOutstanding, calculateTotalReceived } from '../utils/formulas';
@@ -68,7 +69,7 @@ const Dashboard = () => {
         <div className="card recent-section">
           <div className="card-header">
             <h2>Recent Invoices</h2>
-            <button className="btn btn-secondary">View All</button>
+            <Link to="/data-entry" className="btn btn-secondary">View All</Link>
           </div>
           <div className="table-container">
             <table>

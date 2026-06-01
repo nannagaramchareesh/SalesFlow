@@ -12,6 +12,9 @@ const CollectionEntry = () => {
   const [paymentForms, setPaymentForms] = useState({});
   const [zoomedImageUrl, setZoomedImageUrl] = useState(null);
 
+  // View mode
+  const [viewMode, setViewMode] = useState('dealers'); // 'dealers' or 'all_bills'
+
   // Dealer view filters
   const [dealerSearch, setDealerSearch] = useState('');
   const [dealerBalanceFilter, setDealerBalanceFilter] = useState('all'); // all, outstanding, zero
@@ -22,12 +25,45 @@ const CollectionEntry = () => {
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState('all'); // all, Unpaid, Partial, Paid
   const [invoiceOverdueFilter, setInvoiceOverdueFilter] = useState('all'); // all, overdue, overdue_30, overdue_60, overdue_90, not_overdue
   const [invoiceBrandFilter, setInvoiceBrandFilter] = useState('all'); // all, or specific brand
+  const [invoiceDealerFilter, setInvoiceDealerFilter] = useState('all'); // all, or specific dealer
+  const [invoiceSalesTeamFilter, setInvoiceSalesTeamFilter] = useState('all'); // all, or specific sales team
+  const [invoiceBalanceStatusFilter, setInvoiceBalanceStatusFilter] = useState('all'); // all, outstanding, zero
   const [invoiceOverdueSort, setInvoiceOverdueSort] = useState('none'); // none, asc, desc
+  const [invoiceBalanceSort, setInvoiceBalanceSort] = useState('none'); // none, asc, desc
   const [expandedPayments, setExpandedPayments] = useState({});
+  const [dueAlerts, setDueAlerts] = useState([]);
+  const [billHighlights, setBillHighlights] = useState([]);
+  const [dealerHighlights, setDealerHighlights] = useState([]);
 
 
   useEffect(() => {
     loadInvoices();
+
+    // Load dynamic rules
+    const savedAlerts = localStorage.getItem('salesflow_due_alerts');
+    if (savedAlerts) {
+      setDueAlerts(JSON.parse(savedAlerts));
+    } else {
+      setDueAlerts([{ id: 'def-alert-1', brand: 'All', overdueDays: 30 }]);
+    }
+    
+    const savedBillHighlights = localStorage.getItem('salesflow_bill_highlights');
+    if (savedBillHighlights) {
+      setBillHighlights(JSON.parse(savedBillHighlights));
+    } else {
+      setBillHighlights([
+        { id: 'def-bill-1', brand: 'All', overdueDays: 90, color: 'red' },
+        { id: 'def-bill-2', brand: 'All', overdueDays: 60, color: 'orange' },
+        { id: 'def-bill-3', brand: 'All', overdueDays: 30, color: 'yellow' }
+      ]);
+    }
+
+    const savedDealerHighlights = localStorage.getItem('salesflow_dealer_highlights');
+    if (savedDealerHighlights) {
+      setDealerHighlights(JSON.parse(savedDealerHighlights));
+    } else {
+      setDealerHighlights([{ id: 'def-dealer-1', overdueDays: 45, color: 'red' }]);
+    }
   }, []);
 
   const loadInvoices = async () => {
@@ -144,7 +180,25 @@ const CollectionEntry = () => {
         </div>
       </div>
 
-      {!selectedDealer ? (
+      {/* View Mode Toggle */}
+      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+        <button
+          onClick={() => { setViewMode('dealers'); setSelectedDealer(''); }}
+          className={`btn ${viewMode === 'dealers' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ fontWeight: 600, gap: '0.35rem' }}
+        >
+          📂 Group by Dealers
+        </button>
+        <button
+          onClick={() => setViewMode('all_bills')}
+          className={`btn ${viewMode === 'all_bills' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ fontWeight: 600, gap: '0.35rem' }}
+        >
+          📄 View All Bills at Once
+        </button>
+      </div>
+
+      {viewMode === 'dealers' && !selectedDealer ? (
         /* Dealers List Rows View with Headers */
         <div>
           <div style={{ marginBottom: '1.25rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
@@ -246,11 +300,40 @@ const CollectionEntry = () => {
                     const selectedDealerInvoices = dealerInvoices.filter(inv => selectedInvoices[inv._id]);
                     const selectedBalance = selectedDealerInvoices.reduce((sum, inv) => sum + (inv.balance !== undefined ? inv.balance : inv.invoiceValue), 0);
 
+                    const maxOverdue = dealerInvoices.reduce((max, inv) => {
+                      if (inv.status === 'Paid') return max;
+                      const overdue = calculateOverdueDays(inv.dateOfInvoice || inv.date);
+                      return Math.max(max, overdue);
+                    }, 0);
+
+                    let matchedDealerColor = null;
+                    let highestDealerOverdue = -1;
+
+                    dealerHighlights.forEach(rule => {
+                      if (maxOverdue >= rule.overdueDays && rule.overdueDays > highestDealerOverdue) {
+                        highestDealerOverdue = rule.overdueDays;
+                        matchedDealerColor = rule.color;
+                      }
+                    });
+
+                    const dealerHighlightTheme = matchedDealerColor ? {
+                      red: { bg: '#fef2f2', border: '#fca5a5' },
+                      orange: { bg: '#fff7ed', border: '#fed7aa' },
+                      yellow: { bg: '#fefce8', border: '#fef08a' },
+                      blue: { bg: '#eff6ff', border: '#bfdbfe' },
+                      green: { bg: '#f0fdf4', border: '#bbf7d0' },
+                    }[matchedDealerColor] : null;
+
                     return (
                       <div 
                         key={dealer} 
                         className="dealer-row" 
                         onClick={() => setSelectedDealer(dealer)}
+                        style={{
+                          background: dealerHighlightTheme ? dealerHighlightTheme.bg : 'white',
+                          borderColor: dealerHighlightTheme ? dealerHighlightTheme.border : '#e2e8f0',
+                          borderWidth: dealerHighlightTheme ? '2px' : '1px'
+                        }}
                       >
                         <div style={{ flex: '2', minWidth: '240px', fontWeight: 700, color: 'var(--primary-color)', fontSize: '0.95rem' }}>
                           {dealer}
@@ -305,12 +388,41 @@ const CollectionEntry = () => {
                     const selectedDealerInvoices = dealerInvoices.filter(inv => selectedInvoices[inv._id]);
                     const selectedBalance = selectedDealerInvoices.reduce((sum, inv) => sum + (inv.balance !== undefined ? inv.balance : inv.invoiceValue), 0);
 
+                    const maxOverdue = dealerInvoices.reduce((max, inv) => {
+                      if (inv.status === 'Paid') return max;
+                      const overdue = calculateOverdueDays(inv.dateOfInvoice || inv.date);
+                      return Math.max(max, overdue);
+                    }, 0);
+
+                    let matchedDealerColor = null;
+                    let highestDealerOverdue = -1;
+
+                    dealerHighlights.forEach(rule => {
+                      if (maxOverdue >= rule.overdueDays && rule.overdueDays > highestDealerOverdue) {
+                        highestDealerOverdue = rule.overdueDays;
+                        matchedDealerColor = rule.color;
+                      }
+                    });
+
+                    const dealerHighlightTheme = matchedDealerColor ? {
+                      red: { bg: '#fef2f2', border: '#fca5a5' },
+                      orange: { bg: '#fff7ed', border: '#fed7aa' },
+                      yellow: { bg: '#fefce8', border: '#fef08a' },
+                      blue: { bg: '#eff6ff', border: '#bfdbfe' },
+                      green: { bg: '#f0fdf4', border: '#bbf7d0' },
+                    }[matchedDealerColor] : null;
+
                     return (
                       <div 
                         key={dealer} 
                         className="mobile-card"
                         onClick={() => setSelectedDealer(dealer)}
-                        style={{ cursor: 'pointer', marginBottom: 0 }}
+                        style={{ 
+                          cursor: 'pointer', 
+                          marginBottom: 0,
+                          background: dealerHighlightTheme ? dealerHighlightTheme.bg : 'white',
+                          borderLeft: dealerHighlightTheme ? `4px solid ${dealerHighlightTheme.border}` : 'none'
+                        }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
                           <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--primary-color)' }}>{dealer}</h3>
@@ -346,12 +458,69 @@ const CollectionEntry = () => {
           )}
         </div>
       ) : (
-        /* Selected Dealer Invoice Details View */
+        /* Selected Dealer / Global Invoice Details View */
         (() => {
-          const dealerInvoices = invoices.filter(inv => inv.dealerName === selectedDealer);
+          const isAllBills = viewMode === 'all_bills';
+          const dealerInvoices = isAllBills ? invoices : invoices.filter(inv => inv.dealerName === selectedDealer);
           
-          // Dynamic unique brands for the current dealer's invoices
+          // Dynamic unique brands
           const uniqueBrands = [...new Set(dealerInvoices.map(inv => inv.brand).filter(Boolean))];
+
+          const getTriggeredAlerts = () => {
+            const triggered = [];
+            dueAlerts.forEach(rule => {
+              const matching = dealerInvoices.filter(inv => {
+                const isBrandMatch = rule.brand === 'All' || inv.brand === rule.brand;
+                const balance = inv.balance !== undefined ? inv.balance : (inv.invoiceValue || 0);
+                const overdue = inv.status === 'Paid' ? 0 : calculateOverdueDays(inv.dateOfInvoice || inv.date);
+                return isBrandMatch && balance > 0 && overdue >= rule.overdueDays;
+              });
+
+              if (matching.length > 0) {
+                triggered.push({
+                  id: rule.id,
+                  count: matching.length,
+                  brand: rule.brand,
+                  days: rule.overdueDays,
+                  totalOutstanding: matching.reduce((sum, inv) => sum + (inv.balance !== undefined ? inv.balance : (inv.invoiceValue || 0)), 0)
+                });
+              }
+            });
+            return triggered;
+          };
+
+          const getBillHighlightStyle = (inv, overdue) => {
+            if (inv.status === 'Paid' || overdue <= 0) return {};
+            let matchedColor = null;
+            let highestOverdue = -1;
+
+            billHighlights.forEach(rule => {
+              const isBrandMatch = rule.brand === 'All' || inv.brand === rule.brand;
+              if (isBrandMatch && overdue >= rule.overdueDays && rule.overdueDays > highestOverdue) {
+                highestOverdue = rule.overdueDays;
+                matchedColor = rule.color;
+              }
+            });
+
+            if (matchedColor) {
+              const theme = {
+                red: { bg: '#fee2e2', text: '#991b1b', font: 700 },
+                orange: { bg: '#ffedd5', text: '#9a3412', font: 700 },
+                yellow: { bg: '#fef9c3', text: '#854d0e', font: 700 },
+                blue: { bg: '#eff6ff', text: '#1d4ed8', font: 700 },
+                green: { bg: '#f0fdf4', text: '#15803d', font: 700 },
+              }[matchedColor];
+
+              if (theme) {
+                return { background: theme.bg, color: theme.text, fontWeight: theme.font };
+              }
+            }
+            return {};
+          };
+          // Unique dealers list for dropdown in global view
+          const uniqueDealersList = [...new Set(invoices.map(inv => inv.dealerName).filter(Boolean))].sort();
+          // Unique sales teams list for dropdown
+          const uniqueSalesTeamsList = [...new Set(invoices.map(inv => inv.salesTeam).filter(Boolean))].sort();
 
           let filteredInvoices = dealerInvoices.filter(inv => {
             if (invoiceSearch && !inv.invoiceNumber.toLowerCase().includes(invoiceSearch.toLowerCase())) {
@@ -363,6 +532,26 @@ const CollectionEntry = () => {
             }
 
             if (invoiceBrandFilter !== 'all' && inv.brand !== invoiceBrandFilter) {
+              return false;
+            }
+
+            // Global View: Dealer Filter
+            if (isAllBills && invoiceDealerFilter !== 'all' && inv.dealerName !== invoiceDealerFilter) {
+              return false;
+            }
+
+            // Sales Team Filter
+            if (invoiceSalesTeamFilter !== 'all' && inv.salesTeam !== invoiceSalesTeamFilter) {
+              return false;
+            }
+
+            // Balance Status Filter
+            const value = inv.invoiceValue || 0;
+            const balance = inv.balance !== undefined ? inv.balance : value;
+            if (invoiceBalanceStatusFilter === 'outstanding' && balance <= 0) {
+              return false;
+            }
+            if (invoiceBalanceStatusFilter === 'zero' && balance > 0) {
               return false;
             }
 
@@ -386,6 +575,7 @@ const CollectionEntry = () => {
             return true;
           });
 
+          // Sorting logic
           if (invoiceOverdueSort === 'asc') {
             filteredInvoices.sort((a, b) => {
               const overdueA = a.status === 'Paid' ? 0 : calculateOverdueDays(a.dateOfInvoice || a.date);
@@ -398,10 +588,22 @@ const CollectionEntry = () => {
               const overdueB = b.status === 'Paid' ? 0 : calculateOverdueDays(b.dateOfInvoice || b.date);
               return overdueB - overdueA;
             });
+          } else if (invoiceBalanceSort === 'asc') {
+            filteredInvoices.sort((a, b) => {
+              const balA = a.balance !== undefined ? a.balance : (a.invoiceValue || 0);
+              const balB = b.balance !== undefined ? b.balance : (b.invoiceValue || 0);
+              return balA - balB;
+            });
+          } else if (invoiceBalanceSort === 'desc') {
+            filteredInvoices.sort((a, b) => {
+              const balA = a.balance !== undefined ? a.balance : (a.invoiceValue || 0);
+              const balB = b.balance !== undefined ? b.balance : (b.invoiceValue || 0);
+              return balB - balA;
+            });
           }
 
-          const totalOutstanding = calculateDealerTotalOutstanding(invoices, selectedDealer);
-          const overdueCount = countOverdueBills(invoices, selectedDealer);
+          const totalOutstanding = calculateDealerTotalOutstanding(invoices, isAllBills ? null : selectedDealer);
+          const overdueCount = countOverdueBills(invoices, isAllBills ? null : selectedDealer);
 
           // Selection Calculation
           const selectedDealerInvoices = dealerInvoices.filter(inv => selectedInvoices[inv._id]);
@@ -437,7 +639,7 @@ const CollectionEntry = () => {
               <div style={{ marginBottom: '1.5rem' }}>
                 <button 
                   className="btn btn-secondary" 
-                  onClick={() => setSelectedDealer('')}
+                  onClick={() => { setSelectedDealer(''); setViewMode('dealers'); }}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginBottom: '1.25rem', padding: '0.5rem 1rem' }}
                 >
                   ← Back to Dealers List
@@ -445,7 +647,9 @@ const CollectionEntry = () => {
                 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', background: '#f8fafc', padding: '1.25rem 1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                   <div>
-                    <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary-color)' }}>{selectedDealer}</h2>
+                    <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary-color)' }}>
+                      {isAllBills ? 'All Bills (Global View)' : selectedDealer}
+                    </h2>
                     <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
                       Viewing {filteredInvoices.length === dealerInvoices.length ? dealerInvoices.length : `${filteredInvoices.length} of ${dealerInvoices.length}`} Invoices
                     </div>
@@ -493,6 +697,22 @@ const CollectionEntry = () => {
                       placeholder="Search by bill number..."
                     />
                   </div>
+                  {isAllBills && (
+                    <div style={{ minWidth: '180px', flex: '1' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Dealer</label>
+                      <select
+                        className="form-input"
+                        style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                        value={invoiceDealerFilter}
+                        onChange={e => setInvoiceDealerFilter(e.target.value)}
+                      >
+                        <option value="all">All Dealers</option>
+                        {uniqueDealersList.map(dealer => (
+                          <option key={dealer} value={dealer}>{dealer}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div style={{ minWidth: '130px' }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Status</label>
                     <select
@@ -505,6 +725,33 @@ const CollectionEntry = () => {
                       <option value="Unpaid">Unpaid</option>
                       <option value="Partial">Partial</option>
                       <option value="Paid">Paid</option>
+                    </select>
+                  </div>
+                  <div style={{ minWidth: '130px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Sales Team</label>
+                    <select
+                      className="form-input"
+                      style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                      value={invoiceSalesTeamFilter}
+                      onChange={e => setInvoiceSalesTeamFilter(e.target.value)}
+                    >
+                      <option value="all">All Teams</option>
+                      {uniqueSalesTeamsList.map(team => (
+                        <option key={team} value={team}>{team}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ minWidth: '130px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Balance</label>
+                    <select
+                      className="form-input"
+                      style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                      value={invoiceBalanceStatusFilter}
+                      onChange={e => setInvoiceBalanceStatusFilter(e.target.value)}
+                    >
+                      <option value="all">All Balances</option>
+                      <option value="outstanding">Outstanding (&gt; ₹0)</option>
+                      <option value="zero">Zero (₹0)</option>
                     </select>
                   </div>
                   <div style={{ minWidth: '150px' }}>
@@ -523,7 +770,7 @@ const CollectionEntry = () => {
                       <option value="not_overdue">Not Overdue</option>
                     </select>
                   </div>
-                   <div style={{ minWidth: '130px' }}>
+                  <div style={{ minWidth: '130px' }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Brand</label>
                     <select
                       className="form-input"
@@ -537,20 +784,39 @@ const CollectionEntry = () => {
                       ))}
                     </select>
                   </div>
-                  <div style={{ minWidth: '150px' }}>
+                  <div style={{ minWidth: '130px' }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Sort Overdue</label>
                     <select
                       className="form-input"
                       style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
                       value={invoiceOverdueSort}
-                      onChange={e => setInvoiceOverdueSort(e.target.value)}
+                      onChange={e => {
+                        setInvoiceOverdueSort(e.target.value);
+                        setInvoiceBalanceSort('none');
+                      }}
                     >
                       <option value="none">No Sort</option>
                       <option value="asc">Low to High</option>
                       <option value="desc">High to Low</option>
                     </select>
                   </div>
-                  {(invoiceSearch || invoiceStatusFilter !== 'all' || invoiceOverdueFilter !== 'all' || invoiceBrandFilter !== 'all' || invoiceOverdueSort !== 'none') && (
+                  <div style={{ minWidth: '130px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Sort Balance</label>
+                    <select
+                      className="form-input"
+                      style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                      value={invoiceBalanceSort}
+                      onChange={e => {
+                        setInvoiceBalanceSort(e.target.value);
+                        setInvoiceOverdueSort('none');
+                      }}
+                    >
+                      <option value="none">No Sort</option>
+                      <option value="asc">Low to High</option>
+                      <option value="desc">High to Low</option>
+                    </select>
+                  </div>
+                  {(invoiceSearch || invoiceStatusFilter !== 'all' || invoiceOverdueFilter !== 'all' || invoiceBrandFilter !== 'all' || invoiceDealerFilter !== 'all' || invoiceSalesTeamFilter !== 'all' || invoiceBalanceStatusFilter !== 'all' || invoiceOverdueSort !== 'none' || invoiceBalanceSort !== 'none') && (
                     <button
                       className="btn btn-secondary"
                       style={{ fontSize: '0.8rem', alignSelf: 'flex-end', height: '36px', padding: '0 1rem', display: 'inline-flex', alignItems: 'center' }}
@@ -559,7 +825,11 @@ const CollectionEntry = () => {
                         setInvoiceStatusFilter('all');
                         setInvoiceOverdueFilter('all');
                         setInvoiceBrandFilter('all');
+                        setInvoiceDealerFilter('all');
+                        setInvoiceSalesTeamFilter('all');
+                        setInvoiceBalanceStatusFilter('all');
                         setInvoiceOverdueSort('none');
+                        setInvoiceBalanceSort('none');
                       }}
                     >
                       Reset
@@ -614,6 +884,27 @@ const CollectionEntry = () => {
                     </div>
                   </div>
                 )}
+
+                {getTriggeredAlerts().map(alertInfo => (
+                  <div key={alertInfo.id} style={{
+                    marginBottom: '0.75rem',
+                    padding: '0.85rem 1.25rem',
+                    background: '#fff5f5',
+                    borderLeft: '4px solid #ef4444',
+                    borderRadius: '6px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                    color: '#b91c1c',
+                    fontSize: '0.9rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem'
+                  }}>
+                    <span style={{ fontSize: '1.25rem' }}>⚠️</span>
+                    <div style={{ flex: 1 }}>
+                      <strong>Due Alert:</strong> Found <strong>{alertInfo.count}</strong> bill(s) {alertInfo.brand !== 'All' ? <>for brand <strong>{alertInfo.brand}</strong></> : <>overall</>} overdue by <strong>{alertInfo.days} days or more</strong>. Total Outstanding: <strong>₹{alertInfo.totalOutstanding.toLocaleString()}</strong>.
+                    </div>
+                  </div>
+                ))}
 
                 {/* Desktop View Table */}
                 <div className="desktop-view" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
@@ -718,11 +1009,20 @@ const CollectionEntry = () => {
                               </div>
                             </td>
                             <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 500 }}>₹{value.toLocaleString()}</td>
-                            <td style={{ padding: '1rem', textAlign: 'center' }}>
-                              <span style={{ color: overdue > 0 && inv.status !== 'Paid' ? '#b91c1c' : '#64748b', fontWeight: 600 }}>
-                                {inv.status === 'Paid' ? 0 : overdue}
-                              </span>
-                            </td>
+                            {(() => {
+                              const style = getBillHighlightStyle(inv, overdue);
+                              return (
+                                <td style={{ 
+                                  padding: '1rem', 
+                                  textAlign: 'center',
+                                  background: style.background || 'inherit',
+                                  color: style.color || (overdue > 0 && inv.status !== 'Paid' ? '#b91c1c' : '#64748b'),
+                                  fontWeight: style.fontWeight || 600
+                                }}>
+                                  {inv.status === 'Paid' ? 0 : overdue}
+                                </td>
+                              );
+                            })()}
                             <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 700, color: balance > 0 ? '#b91c1c' : '#15803d' }}>₹{balance.toLocaleString()}</td>
                             <td style={{ padding: '1rem' }}>{inv.brand || '-'}</td>
                             <td style={{ padding: '1rem' }}>{new Date(inv.dateOfInvoice || inv.date).toLocaleDateString()}</td>
@@ -865,7 +1165,7 @@ const CollectionEntry = () => {
                                   </span>
                                 </div>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                                  Brand: <strong>{inv.brand || '-'}</strong> | Sales Team: <strong>{inv.salesTeam || '-'}</strong> | Belt: <strong>{inv.belt || '-'}</strong>
+                                  {isAllBills && <>Dealer: <strong>{inv.dealerName}</strong> | </>}Brand: <strong>{inv.brand || '-'}</strong> | Sales Team: <strong>{inv.salesTeam || '-'}</strong> | Belt: <strong>{inv.belt || '-'}</strong>
                                 </div>
                               </div>
                             </div>
@@ -886,9 +1186,23 @@ const CollectionEntry = () => {
                               </div>
                               <div>
                                 <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Overdue Days</div>
-                                <div style={{ fontWeight: 700, color: overdue > 0 && inv.status !== 'Paid' ? '#b91c1c' : '#64748b', fontSize: '0.9rem', marginTop: '0.1rem' }}>
-                                  {inv.status === 'Paid' ? 0 : overdue} Days
-                                </div>
+                                {(() => {
+                                  const style = getBillHighlightStyle(inv, overdue);
+                                  return (
+                                    <div style={{ 
+                                      fontWeight: 700, 
+                                      fontSize: '0.85rem', 
+                                      marginTop: '0.1rem',
+                                      padding: style.background ? '0.2rem 0.5rem' : '0',
+                                      borderRadius: '4px',
+                                      display: 'inline-block',
+                                      background: style.background || 'none',
+                                      color: style.color || (overdue > 0 && inv.status !== 'Paid' ? '#b91c1c' : '#64748b')
+                                    }}>
+                                      {inv.status === 'Paid' ? 0 : overdue} Days
+                                    </div>
+                                  );
+                                })()}
                               </div>
                               <div>
                                 <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Invoice Date</div>

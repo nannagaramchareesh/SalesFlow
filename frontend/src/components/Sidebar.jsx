@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, FileText, IndianRupee, RotateCcw, Camera, Users } from 'lucide-react';
+import { LayoutDashboard, FileText, IndianRupee, RotateCcw, Camera, Users, BarChart3, Bell } from 'lucide-react';
 import './Sidebar.css';
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
@@ -37,6 +37,14 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
           <NavLink to="/dealers" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
             <Users size={20} />
             <span>Dealers Master</span>
+          </NavLink>
+          <NavLink to="/reports" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
+            <BarChart3 size={20} />
+            <span>Reports</span>
+          </NavLink>
+          <NavLink to="/alerts" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
+            <Bell size={20} />
+            <span>Alerts & Rules</span>
           </NavLink>
         </nav>
       </aside>

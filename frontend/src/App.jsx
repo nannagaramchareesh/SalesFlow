@@ -6,6 +6,8 @@ import CollectionEntry from './pages/CollectionEntry';
 import ReturnsEntry from './pages/ReturnsEntry';
 import InvoiceImage from './pages/InvoiceImage';
 import DealersMaster from './pages/DealersMaster';
+import Reports from './pages/Reports';
+import AlertsSettings from './pages/AlertsSettings';
 
 function App() {
   return (
@@ -18,6 +20,8 @@ function App() {
           <Route path="returns" element={<ReturnsEntry />} />
           <Route path="invoice-image" element={<InvoiceImage />} />
           <Route path="dealers" element={<DealersMaster />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="alerts" element={<AlertsSettings />} />
         </Route>
       </Routes>
     </BrowserRouter>
