@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { IndianRupee, FileText, TrendingUp, AlertCircle } from 'lucide-react';
 import { getInvoices, getCollections } from '../utils/api';
 import { calculateDealerTotalOutstanding, calculateTotalReceived } from '../utils/formulas';
@@ -7,16 +6,17 @@ import './Dashboard.css';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({ totalSales: 0, collected: 0, outstanding: 0 });
-  const [recentInvoices, setRecentInvoices] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
-      const invoices = await getInvoices();
+      const invoicesData = await getInvoices();
       const collections = await getCollections();
       
-      const totalSales = invoices.reduce((sum, inv) => sum + Number(inv.invoiceValue || 0), 0);
-      const totalOutstanding = calculateDealerTotalOutstanding(invoices);
-      const totalCollected = invoices.reduce((sum, inv) => sum + calculateTotalReceived(inv), 0);
+      const totalSales = invoicesData.reduce((sum, inv) => sum + Number(inv.invoiceValue || 0), 0);
+      const totalOutstanding = calculateDealerTotalOutstanding(invoicesData);
+      const totalCollected = invoicesData.reduce((sum, inv) => sum + calculateTotalReceived(inv), 0);
       
       setStats({
         totalSales,
@@ -24,10 +24,12 @@ const Dashboard = () => {
         outstanding: totalOutstanding
       });
       
-      setRecentInvoices(invoices.slice(0, 5));
+      setInvoices(invoicesData);
     };
     loadData();
   }, []);
+
+  const displayedInvoices = showAll ? invoices : invoices.slice(0, 5);
 
   return (
     <div className="dashboard">
@@ -68,8 +70,10 @@ const Dashboard = () => {
       <div className="dashboard-content">
         <div className="card recent-section">
           <div className="card-header">
-            <h2>Recent Invoices</h2>
-            <Link to="/data-entry" className="btn btn-secondary">View All</Link>
+            <h2>{showAll ? 'All Invoices' : 'Recent Invoices'}</h2>
+            <button onClick={() => setShowAll(!showAll)} className="btn btn-secondary">
+              {showAll ? 'View Less' : 'View All'}
+            </button>
           </div>
           <div className="table-container">
             <table>
@@ -83,7 +87,7 @@ const Dashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {recentInvoices.map((inv) => (
+                {displayedInvoices.map((inv) => (
                   <tr key={inv._id}>
                     <td>{inv.invoiceNumber}</td>
                     <td style={{fontWeight: 500}}>{inv.dealerName}</td>
@@ -96,7 +100,7 @@ const Dashboard = () => {
                     </td>
                   </tr>
                 ))}
-                {recentInvoices.length === 0 && (
+                {displayedInvoices.length === 0 && (
                   <tr>
                     <td colSpan="5" style={{textAlign: 'center'}}>No recent invoices</td>
                   </tr>
