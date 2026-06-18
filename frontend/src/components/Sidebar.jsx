@@ -46,6 +46,30 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
             <Bell size={20} />
             <span>Alerts & Rules</span>
           </NavLink>
+          <NavLink to="/alerts" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
+            <Bell size={20} />
+            <span>Catalogues</span>
+          </NavLink>
+          <NavLink to="/alerts" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
+            <Bell size={20} />
+            <span>Price Lists</span>
+          </NavLink>
+          <NavLink to="/alerts" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
+            <Bell size={20} />
+            <span>Credit notes, Sales Returns & Debit Notes</span>
+          </NavLink>
+          <NavLink to="/alerts" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
+            <Bell size={20} />
+            <span>Schemes</span>
+          </NavLink>
+          <NavLink to="/alerts" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
+            <Bell size={20} />
+            <span>Stock</span>
+          </NavLink>
+          <NavLink to="/alerts" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
+            <Bell size={20} />
+            <span>Cheques</span>
+          </NavLink>
         </nav>
       </aside>
     </>

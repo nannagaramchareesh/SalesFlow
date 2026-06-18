@@ -27,6 +27,8 @@ const CollectionEntry = () => {
   const [invoiceBrandFilter, setInvoiceBrandFilter] = useState('all'); // all, or specific brand
   const [invoiceDealerFilter, setInvoiceDealerFilter] = useState('all'); // all, or specific dealer
   const [invoiceSalesTeamFilter, setInvoiceSalesTeamFilter] = useState('all'); // all, or specific sales team
+  const [invoiceBeltFilter, setInvoiceBeltFilter] = useState('all'); // all, or specific belt
+  const [invoiceMonthFilter, setInvoiceMonthFilter] = useState('all'); // all, or specific month
   const [invoiceBalanceStatusFilter, setInvoiceBalanceStatusFilter] = useState('all'); // all, outstanding, zero
   const [invoiceOverdueSort, setInvoiceOverdueSort] = useState('none'); // none, asc, desc
   const [invoiceBalanceSort, setInvoiceBalanceSort] = useState('none'); // none, asc, desc
@@ -521,6 +523,10 @@ const CollectionEntry = () => {
           const uniqueDealersList = [...new Set(invoices.map(inv => inv.dealerName).filter(Boolean))].sort();
           // Unique sales teams list for dropdown
           const uniqueSalesTeamsList = [...new Set(invoices.map(inv => inv.salesTeam).filter(Boolean))].sort();
+          // Unique belts list for dropdown
+          const uniqueBeltsList = [...new Set(invoices.map(inv => inv.belt).filter(Boolean))].sort();
+          // Unique months list for dropdown
+          const uniqueMonthsList = [...new Set(invoices.map(inv => inv.month).filter(Boolean))].sort();
 
           let filteredInvoices = dealerInvoices.filter(inv => {
             if (invoiceSearch && !inv.invoiceNumber.toLowerCase().includes(invoiceSearch.toLowerCase())) {
@@ -542,6 +548,16 @@ const CollectionEntry = () => {
 
             // Sales Team Filter
             if (invoiceSalesTeamFilter !== 'all' && inv.salesTeam !== invoiceSalesTeamFilter) {
+              return false;
+            }
+
+            // Belt Filter
+            if (invoiceBeltFilter !== 'all' && inv.belt !== invoiceBeltFilter) {
+              return false;
+            }
+
+            // Month Filter
+            if (invoiceMonthFilter !== 'all' && inv.month !== invoiceMonthFilter) {
               return false;
             }
 
@@ -742,6 +758,34 @@ const CollectionEntry = () => {
                     </select>
                   </div>
                   <div style={{ minWidth: '130px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Belt</label>
+                    <select
+                      className="form-input"
+                      style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                      value={invoiceBeltFilter}
+                      onChange={e => setInvoiceBeltFilter(e.target.value)}
+                    >
+                      <option value="all">All Belts</option>
+                      {uniqueBeltsList.map(belt => (
+                        <option key={belt} value={belt}>{belt}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ minWidth: '130px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Month</label>
+                    <select
+                      className="form-input"
+                      style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                      value={invoiceMonthFilter}
+                      onChange={e => setInvoiceMonthFilter(e.target.value)}
+                    >
+                      <option value="all">All Months</option>
+                      {uniqueMonthsList.map(m => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ minWidth: '130px' }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Balance</label>
                     <select
                       className="form-input"
@@ -816,7 +860,7 @@ const CollectionEntry = () => {
                       <option value="desc">High to Low</option>
                     </select>
                   </div>
-                  {(invoiceSearch || invoiceStatusFilter !== 'all' || invoiceOverdueFilter !== 'all' || invoiceBrandFilter !== 'all' || invoiceDealerFilter !== 'all' || invoiceSalesTeamFilter !== 'all' || invoiceBalanceStatusFilter !== 'all' || invoiceOverdueSort !== 'none' || invoiceBalanceSort !== 'none') && (
+                  {(invoiceSearch || invoiceStatusFilter !== 'all' || invoiceOverdueFilter !== 'all' || invoiceBrandFilter !== 'all' || invoiceDealerFilter !== 'all' || invoiceSalesTeamFilter !== 'all' || invoiceBeltFilter !== 'all' || invoiceMonthFilter !== 'all' || invoiceBalanceStatusFilter !== 'all' || invoiceOverdueSort !== 'none' || invoiceBalanceSort !== 'none') && (
                     <button
                       className="btn btn-secondary"
                       style={{ fontSize: '0.8rem', alignSelf: 'flex-end', height: '36px', padding: '0 1rem', display: 'inline-flex', alignItems: 'center' }}
@@ -827,6 +871,8 @@ const CollectionEntry = () => {
                         setInvoiceBrandFilter('all');
                         setInvoiceDealerFilter('all');
                         setInvoiceSalesTeamFilter('all');
+                        setInvoiceBeltFilter('all');
+                        setInvoiceMonthFilter('all');
                         setInvoiceBalanceStatusFilter('all');
                         setInvoiceOverdueSort('none');
                         setInvoiceBalanceSort('none');
@@ -908,7 +954,7 @@ const CollectionEntry = () => {
 
                 {/* Desktop View Table */}
                 <div className="desktop-view" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1900px', fontSize: '0.85rem' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '2000px', fontSize: '0.85rem' }}>
                     <thead>
                       <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                         {/* Frozen Column containing Checkbox + Dealer Name */}
@@ -930,6 +976,7 @@ const CollectionEntry = () => {
                         <th style={{ padding: '1rem', textAlign: 'center', fontWeight: 600 }}>Overdue Days</th>
                         <th style={{ padding: '1rem', textAlign: 'right', fontWeight: 600 }}>Balance</th>
                         <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600 }}>Brand</th>
+                        <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600 }}>Month</th>
                         <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600 }}>Date of Invoice</th>
                         <th style={{ padding: '1rem', textAlign: 'right', fontWeight: 600 }}>Total Received</th>
                         <th style={{ padding: '1rem', textAlign: 'center', fontWeight: 600 }}>Part Payments</th>
@@ -951,7 +998,7 @@ const CollectionEntry = () => {
                     <tbody>
                       {filteredInvoices.length === 0 ? (
                         <tr>
-                          <td colSpan="18" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                          <td colSpan="19" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
                             <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔍</div>
                             <div>No bills match your filter criteria.</div>
                           </td>
@@ -1025,6 +1072,7 @@ const CollectionEntry = () => {
                             })()}
                             <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 700, color: balance > 0 ? '#b91c1c' : '#15803d' }}>₹{balance.toLocaleString()}</td>
                             <td style={{ padding: '1rem' }}>{inv.brand || '-'}</td>
+                            <td style={{ padding: '1rem' }}>{inv.month || '-'}</td>
                             <td style={{ padding: '1rem' }}>{new Date(inv.dateOfInvoice || inv.date).toLocaleDateString()}</td>
                             <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 600, color: '#0369a1' }}>₹{totalReceived.toLocaleString()}</td>
                             <td style={{ padding: '1rem', textAlign: 'center' }}>
@@ -1165,7 +1213,7 @@ const CollectionEntry = () => {
                                   </span>
                                 </div>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                                  {isAllBills && <>Dealer: <strong>{inv.dealerName}</strong> | </>}Brand: <strong>{inv.brand || '-'}</strong> | Sales Team: <strong>{inv.salesTeam || '-'}</strong> | Belt: <strong>{inv.belt || '-'}</strong>
+                                  {isAllBills && <>Dealer: <strong>{inv.dealerName}</strong> | </>}Brand: <strong>{inv.brand || '-'}</strong> | Month: <strong>{inv.month || '-'}</strong> | Sales Team: <strong>{inv.salesTeam || '-'}</strong> | Belt: <strong>{inv.belt || '-'}</strong>
                                 </div>
                               </div>
                             </div>
@@ -1211,9 +1259,9 @@ const CollectionEntry = () => {
                                 </div>
                               </div>
                               <div>
-                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Sales Team / Brand / Belt</div>
+                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 600 }}>Sales Team / Brand / Belt / Month</div>
                                 <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.85rem', marginTop: '0.1rem' }}>
-                                  {inv.salesTeam || '-'} / {inv.brand || '-'} / {inv.belt || '-'}
+                                  {inv.salesTeam || '-'} / {inv.brand || '-'} / {inv.belt || '-'} / {inv.month || '-'}
                                 </div>
                               </div>
                             </div>

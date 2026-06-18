@@ -1,20 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { getInvoices } from '../utils/api';
-import { calculateOverdueDays, calculateTotalReceived } from '../utils/formulas';
-import { BarChart3, Users, Calendar, Printer, Search, Building2, Layers, TrendingUp, MessageCircle } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
+import { getInvoices } from '../utils/api';
+import { calculateOverdueDays, calculateDealerTotalOutstanding, countOverdueBills } from '../utils/formulas';
 
 const Reports = () => {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('aging'); // aging, brand, month, team
-  const [searchQuery, setSearchQuery] = useState('');
-  
-  // WhatsApp Share States
-  const [showWhatsappModal, setShowWhatsappModal] = useState(false);
-  const [whatsappNumber, setWhatsappNumber] = useState('');
-  const [shareFormat, setShareFormat] = useState('text'); // text, pdf, jpg
+  const [selectedDealer, setSelectedDealer] = useState('');
+  const [selectedInvoices, setSelectedInvoices] = useState({});
+  const [viewMode, setViewMode] = useState('dealers'); // 'dealers' or 'all_bills'
+  const [sharingPdf, setSharingPdf] = useState(false);
+
+  // Dealer view filters
+  const [dealerSearch, setDealerSearch] = useState('');
+  const [dealerBalanceFilter, setDealerBalanceFilter] = useState('all'); // all, outstanding, zero
+  const [dealerOverdueFilter, setDealerOverdueFilter] = useState('all'); // all, has_overdue, no_overdue
+
+  // Invoice view filters
+  const [invoiceSearch, setInvoiceSearch] = useState('');
+  const [invoiceStatusFilter, setInvoiceStatusFilter] = useState('all'); // all, Unpaid, Partial, Paid
+  const [invoiceOverdueFilter, setInvoiceOverdueFilter] = useState('all'); // all, overdue, overdue_30, overdue_60, overdue_90, not_overdue
+  const [invoiceBrandFilter, setInvoiceBrandFilter] = useState('all'); // all, or specific brand
+  const [invoiceDealerFilter, setInvoiceDealerFilter] = useState('all'); // all, or specific dealer
+  const [invoiceSalesTeamFilter, setInvoiceSalesTeamFilter] = useState('all'); // all, or specific sales team
+  const [invoiceBeltFilter, setInvoiceBeltFilter] = useState('all'); // all, or specific belt
+  const [invoiceMonthFilter, setInvoiceMonthFilter] = useState('all'); // all, or specific month
+  const [invoiceBalanceStatusFilter, setInvoiceBalanceStatusFilter] = useState('all'); // all, outstanding, zero
+  const [invoiceOverdueSort, setInvoiceOverdueSort] = useState('none'); // none, asc, desc
+  const [invoiceBalanceSort, setInvoiceBalanceSort] = useState('none'); // none, asc, desc
 
   useEffect(() => {
     const fetchData = async () => {
@@ -30,319 +44,11 @@ const Reports = () => {
     fetchData();
   }, []);
 
-  // Helper: Get invoice balance
-  const getInvoiceBalance = (inv) => {
-    const val = inv.invoiceValue || 0;
-    return inv.balance !== undefined ? inv.balance : val;
-  };
-
-  // Helper: Get month name and year from date string
-  const getMonthYearStr = (dateStr) => {
-    if (!dateStr) return 'Unknown';
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return 'Unknown';
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    return `${months[d.getMonth()]} ${d.getFullYear()}`;
-  };
-
-  // 1. Dealer Aging Report Calculation
-  const getDealerAgingData = () => {
-    const dealers = {};
-    invoices.forEach(inv => {
-      const dealer = inv.dealerName || 'Unknown Dealer';
-      const balance = getInvoiceBalance(inv);
-      const overdue = inv.status === 'Paid' ? 0 : calculateOverdueDays(inv.dateOfInvoice || inv.date);
-
-      if (!dealers[dealer]) {
-        dealers[dealer] = {
-          name: dealer,
-          outstanding_0_30: 0,
-          outstanding_31_60: 0,
-          outstanding_61_90: 0,
-          outstanding_90_plus: 0,
-          totalOutstanding: 0
-        };
-      }
-
-      dealers[dealer].totalOutstanding += balance;
-
-      if (balance > 0) {
-        if (overdue <= 30) {
-          dealers[dealer].outstanding_0_30 += balance;
-        } else if (overdue <= 60) {
-          dealers[dealer].outstanding_31_60 += balance;
-        } else if (overdue <= 90) {
-          dealers[dealer].outstanding_61_90 += balance;
-        } else {
-          dealers[dealer].outstanding_90_plus += balance;
-        }
-      }
-    });
-
-    return Object.values(dealers);
-  };
-
-  // 2. Brand-wise Report Calculation
-  const getBrandWiseData = () => {
-    const brands = {};
-    invoices.forEach(inv => {
-      const brand = inv.brand || 'No Brand';
-      const value = inv.invoiceValue || 0;
-      const balance = getInvoiceBalance(inv);
-      const received = calculateTotalReceived(inv);
-
-      if (!brands[brand]) {
-        brands[brand] = {
-          name: brand,
-          invoiceCount: 0,
-          totalValue: 0,
-          totalReceived: 0,
-          totalOutstanding: 0
-        };
-      }
-
-      brands[brand].invoiceCount += 1;
-      brands[brand].totalValue += value;
-      brands[brand].totalReceived += received;
-      brands[brand].totalOutstanding += balance;
-    });
-
-    return Object.values(brands);
-  };
-
-  // 3. Month-wise Report Calculation
-  const getMonthWiseData = () => {
-    const months = {};
-    invoices.forEach(inv => {
-      const monthYear = getMonthYearStr(inv.dateOfInvoice || inv.date);
-      const value = inv.invoiceValue || 0;
-      const balance = getInvoiceBalance(inv);
-      const received = calculateTotalReceived(inv);
-
-      if (!months[monthYear]) {
-        months[monthYear] = {
-          name: monthYear,
-          invoiceCount: 0,
-          totalValue: 0,
-          totalReceived: 0,
-          totalOutstanding: 0,
-          // For sorting chronologically
-          sortDate: new Date(inv.dateOfInvoice || inv.date).getTime() || 0
-        };
-      }
-
-      months[monthYear].invoiceCount += 1;
-      months[monthYear].totalValue += value;
-      months[monthYear].totalReceived += received;
-      months[monthYear].totalOutstanding += balance;
-    });
-
-    return Object.values(months).sort((a, b) => b.sortDate - a.sortDate);
-  };
-
-  // 4. Team-wise Report Calculation
-  const getTeamWiseData = () => {
-    const teams = {};
-    invoices.forEach(inv => {
-      const team = inv.salesTeam || 'Unassigned';
-      const value = inv.invoiceValue || 0;
-      const balance = getInvoiceBalance(inv);
-      const received = calculateTotalReceived(inv);
-
-      if (!teams[team]) {
-        teams[team] = {
-          name: team,
-          invoiceCount: 0,
-          totalValue: 0,
-          totalReceived: 0,
-          totalOutstanding: 0
-        };
-      }
-
-      teams[team].invoiceCount += 1;
-      teams[team].totalValue += value;
-      teams[team].totalReceived += received;
-      teams[team].totalOutstanding += balance;
-    });
-
-    return Object.values(teams);
-  };
-
-  // Filter and compute current report dataset based on search query
-  const getReportData = () => {
-    let rawData = [];
-    if (activeTab === 'aging') rawData = getDealerAgingData();
-    else if (activeTab === 'brand') rawData = getBrandWiseData();
-    else if (activeTab === 'month') rawData = getMonthWiseData();
-    else if (activeTab === 'team') rawData = getTeamWiseData();
-
-    if (!searchQuery) return rawData;
-    
-    return rawData.filter(row => 
-      row.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  };
-
-  const reportData = getReportData();
-
-  // Print function
-  const handlePrint = () => {
-    window.print();
-  };
-
-  // Aggregate stats for Cards
-  const getSummaryCards = () => {
-    const totalOut = invoices.reduce((sum, inv) => sum + getInvoiceBalance(inv), 0);
-    const totalInvoicesValue = invoices.reduce((sum, inv) => sum + (inv.invoiceValue || 0), 0);
-    const totalCollections = invoices.reduce((sum, inv) => sum + calculateTotalReceived(inv), 0);
-    
-    const overdueAmt = invoices.reduce((sum, inv) => {
-      if (inv.status === 'Paid') return sum;
-      const overdue = calculateOverdueDays(inv.dateOfInvoice || inv.date);
-      return overdue > 0 ? sum + getInvoiceBalance(inv) : sum;
-    }, 0);
-
-    return [
-      { label: 'Total Outstanding', value: `₹${totalOut.toLocaleString()}`, color: '#b91c1c', icon: <TrendingUp size={24} /> },
-      { label: 'Overdue Amount', value: `₹${overdueAmt.toLocaleString()}`, color: '#ea580c', icon: <Calendar size={24} /> },
-      { label: 'Total Sales (Invoiced)', value: `₹${totalInvoicesValue.toLocaleString()}`, color: '#1e3a8a', icon: <BarChart3 size={24} /> },
-      { label: 'Total Collections', value: `₹${totalCollections.toLocaleString()}`, color: '#15803d', icon: <Users size={24} /> }
-    ];
-  };
-
-  const summaryCards = getSummaryCards();
-
-  // WhatsApp Message Generator
-  const padRight = (str, len) => {
-    str = String(str);
-    if (str.length >= len) return str.substring(0, len);
-    return str + ' '.repeat(len - str.length);
-  };
-
-  const padLeft = (str, len) => {
-    str = String(str);
-    if (str.length >= len) return str.substring(0, len);
-    return ' '.repeat(len - str.length) + str;
-  };
-
-  const truncateStr = (str, len) => {
-    if (str.length <= len) return str;
-    return str.substring(0, len - 1) + '.';
-  };
-
-  const generateWhatsappMessage = () => {
-    let msg = `*SalesFlow Reports & Analytics*\n`;
-    msg += `Date: ${new Date().toLocaleDateString()}\n\n`;
-
-    if (activeTab === 'aging') {
-      msg += `*DEALER AGING REPORT (DAYS)*\n`;
-      msg += `\`\`\`\n`;
-      msg += `${padRight('Dealer', 10)}|${padLeft('0-30', 6)}|${padLeft('31-60', 6)}|${padLeft('61-90', 6)}|${padLeft('>90', 6)}|${padLeft('Total', 7)}\n`;
-      msg += `-`.repeat(46) + `\n`;
-      
-      reportData.forEach(row => {
-        const dealerName = truncateStr(row.name, 10);
-        msg += `${padRight(dealerName, 10)}|${padLeft(Math.round(row.outstanding_0_30), 6)}|${padLeft(Math.round(row.outstanding_31_60), 6)}|${padLeft(Math.round(row.outstanding_61_90), 6)}|${padLeft(Math.round(row.outstanding_90_plus), 6)}|${padLeft(Math.round(row.totalOutstanding), 7)}\n`;
-      });
-
-      msg += `-`.repeat(46) + `\n`;
-      const total_0_30 = reportData.reduce((sum, r) => sum + r.outstanding_0_30, 0);
-      const total_31_60 = reportData.reduce((sum, r) => sum + r.outstanding_31_60, 0);
-      const total_61_90 = reportData.reduce((sum, r) => sum + r.outstanding_61_90, 0);
-      const total_90_plus = reportData.reduce((sum, r) => sum + r.outstanding_90_plus, 0);
-      const grandTotal = reportData.reduce((sum, r) => sum + r.totalOutstanding, 0);
-
-      msg += `${padRight('TOTAL', 10)}|${padLeft(Math.round(total_0_30), 6)}|${padLeft(Math.round(total_31_60), 6)}|${padLeft(Math.round(total_61_90), 6)}|${padLeft(Math.round(total_90_plus), 6)}|${padLeft(Math.round(grandTotal), 7)}\n`;
-      msg += `\`\`\``;
-    } else {
-      const typeLabel = activeTab === 'brand' ? 'Brand' : activeTab === 'month' ? 'Month' : 'Team';
-      msg += `*${typeLabel.toUpperCase()}-WISE PERFORMANCE REPORT*\n`;
-      msg += `\`\`\`\n`;
-      msg += `${padRight(typeLabel, 10)}|${padLeft('Bills', 5)}|${padLeft('Sales', 8)}|${padLeft('Recvd', 8)}|${padLeft('Bal', 8)}\n`;
-      msg += `-`.repeat(44) + `\n`;
-
-      reportData.forEach(row => {
-        const rowName = truncateStr(row.name, 10);
-        msg += `${padRight(rowName, 10)}|${padLeft(row.invoiceCount, 5)}|${padLeft(Math.round(row.totalValue), 8)}|${padLeft(Math.round(row.totalReceived), 8)}|${padLeft(Math.round(row.totalOutstanding), 8)}\n`;
-      });
-
-      msg += `-`.repeat(44) + `\n`;
-      const totalBills = reportData.reduce((sum, r) => sum + r.invoiceCount, 0);
-      const totalVal = reportData.reduce((sum, r) => sum + r.totalValue, 0);
-      const totalRecd = reportData.reduce((sum, r) => sum + r.totalReceived, 0);
-      const totalBal = reportData.reduce((sum, r) => sum + r.totalOutstanding, 0);
-
-      msg += `${padRight('TOTAL', 10)}|${padLeft(totalBills, 5)}|${padLeft(Math.round(totalVal), 8)}|${padLeft(Math.round(totalRecd), 8)}|${padLeft(Math.round(totalBal), 8)}\n`;
-      msg += `\`\`\``;
-    }
-
-    return msg;
-  };
-
-  const handleShareToWhatsapp = async () => {
-    let textMsg = '';
-    const dateStr = new Date().toLocaleDateString().replace(/\//g, '-');
-    const filename = `SalesFlow_${activeTab}_report_${dateStr}`;
-
-    if (shareFormat === 'text') {
-      textMsg = generateWhatsappMessage();
-    } else {
-      const element = document.getElementById('print-section');
-      
-      try {
-        // Capture element canvas
-        const canvas = await html2canvas(element, {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: '#ffffff'
-        });
-        
-        if (shareFormat === 'pdf') {
-          const imgData = canvas.toDataURL('image/jpeg', 1.0);
-          const pdf = new jsPDF('p', 'mm', 'a4');
-          const imgWidth = 210; 
-          const pageHeight = 295; 
-          const imgHeight = (canvas.height * imgWidth) / canvas.width;
-          let heightLeft = imgHeight;
-          let position = 0;
-
-          pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-          heightLeft -= pageHeight;
-
-          while (heightLeft >= 0) {
-            position = heightLeft - imgHeight;
-            pdf.addPage();
-            pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-            heightLeft -= pageHeight;
-          }
-          pdf.save(`${filename}.pdf`);
-        } else if (shareFormat === 'jpg') {
-          const imgData = canvas.toDataURL('image/jpeg', 1.0);
-          const link = document.createElement('a');
-          link.href = imgData;
-          link.download = `${filename}.jpg`;
-          link.click();
-        }
-        
-        textMsg = `Hello, I've shared the *SalesFlow ${activeTab === 'aging' ? 'Aging' : activeTab} Report* with you. Please attach the downloaded ${shareFormat.toUpperCase()} file here.`;
-      } catch (err) {
-        console.error('Error generating file export:', err);
-        alert('Failed to generate export file. Sharing as text.');
-        textMsg = generateWhatsappMessage();
-      }
-    }
-
-    let url = 'https://api.whatsapp.com/send';
-    const params = new URLSearchParams();
-    if (whatsappNumber.trim()) {
-      params.append('phone', whatsappNumber.trim());
-    }
-    params.append('text', textMsg);
-    
-    url += `?${params.toString()}`;
-    window.open(url, '_blank');
-    setShowWhatsappModal(false);
-    setWhatsappNumber('');
+  const toggleInvoiceSelection = (invoiceId) => {
+    setSelectedInvoices(prev => ({
+      ...prev,
+      [invoiceId]: !prev[invoiceId]
+    }));
   };
 
   if (loading) {
@@ -353,357 +59,1063 @@ const Reports = () => {
     );
   }
 
+  // Filter Dealers list
+  const uniqueDealers = [...new Set(invoices.map(inv => inv.dealerName))].filter(Boolean);
+
+  const filteredDealers = uniqueDealers.filter(dealer => {
+    if (dealerSearch && !dealer.toLowerCase().includes(dealerSearch.toLowerCase())) {
+      return false;
+    }
+    
+    const totalOutstanding = calculateDealerTotalOutstanding(invoices, dealer);
+    const overdueCount = countOverdueBills(invoices, dealer);
+
+    if (dealerBalanceFilter === 'outstanding' && totalOutstanding <= 0) {
+      return false;
+    }
+    if (dealerBalanceFilter === 'zero' && totalOutstanding > 0) {
+      return false;
+    }
+
+    if (dealerOverdueFilter === 'has_overdue' && overdueCount <= 0) {
+      return false;
+    }
+    if (dealerOverdueFilter === 'no_overdue' && overdueCount > 0) {
+      return false;
+    }
+
+    return true;
+  });
+
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
-    <div style={{ padding: '0.5rem 0' }}>
-      {/* Print style block */}
+    <div className="page-container" style={{maxWidth: '100%', overflowX: 'hidden'}}>
+      {/* CSS style block for print and responsive layouts */}
       <style>{`
+        /* Hide print-only element on screen */
+        .print-only {
+          display: none !important;
+        }
+        
+        /* Responsive table for screen view */
+        @media screen {
+          .responsive-table {
+            min-width: 1100px;
+          }
+        }
+
+        /* Table styles for both print preview and PDF generator */
+        .print-table {
+          width: 100% !important;
+          border-collapse: collapse !important;
+          table-layout: fixed !important;
+          font-size: 10px !important;
+          background: white !important;
+          color: black !important;
+        }
+        
+        .print-table th, .print-table td {
+          border: 1px solid #cbd5e1 !important;
+          padding: 6px 8px !important;
+          font-size: 10px !important;
+          word-wrap: break-word !important;
+          white-space: normal !important;
+        }
+        
+        .print-table th {
+          background-color: #f1f5f9 !important;
+          font-weight: 700 !important;
+          color: black !important;
+        }
+        
+        .print-table tr {
+          page-break-inside: avoid !important;
+        }
+
         @media print {
+          /* Hide all screen elements */
           body * {
             visibility: hidden;
           }
-          #print-section, #print-section * {
-            visibility: visible;
+          
+          /* Show print-only elements */
+          .print-only, .print-only * {
+            visibility: visible !important;
           }
-          #print-section {
+          
+          .print-only {
+            display: block !important;
             position: absolute;
             left: 0;
             top: 0;
-            width: 100%;
-          }
-          .no-print {
-            display: none !important;
+            width: 100% !important;
+            background: white !important;
+            color: black !important;
+            padding: 0 !important;
+            margin: 0 !important;
           }
         }
       `}</style>
 
-      {/* Header Area */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }} className="no-print">
-        <div>
-          <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: 'var(--primary-color)' }}>Reports & Analytics</h1>
-          <p style={{ margin: '0.25rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Analyze aging balances, sales trends, brands, and sales team productivity.</p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button 
-            onClick={() => setShowWhatsappModal(true)}
-            className="btn" 
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, padding: '0.5rem 1rem', background: '#16a34a', borderColor: '#16a34a', color: 'white' }}
-          >
-            <MessageCircle size={16} />
-            Share on WhatsApp
-          </button>
-          <button 
-            onClick={handlePrint}
-            className="btn btn-secondary" 
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, padding: '0.5rem 1rem' }}
-          >
-            <Printer size={16} />
-            Print Report
-          </button>
-        </div>
-      </div>
+      {(() => {
+        const isAllBills = viewMode === 'all_bills';
+        const dealerInvoices = isAllBills ? invoices : invoices.filter(inv => inv.dealerName === selectedDealer);
+        const uniqueBrands = [...new Set(dealerInvoices.map(inv => inv.brand).filter(Boolean))];
+        const uniqueDealersList = [...new Set(invoices.map(inv => inv.dealerName).filter(Boolean))].sort();
+        const uniqueSalesTeamsList = [...new Set(invoices.map(inv => inv.salesTeam).filter(Boolean))].sort();
+        const uniqueBeltsList = [...new Set(invoices.map(inv => inv.belt).filter(Boolean))].sort();
+        const uniqueMonthsList = [...new Set(invoices.map(inv => inv.month).filter(Boolean))].sort();
 
-      {/* Summary Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.75rem' }} className="no-print">
-        {summaryCards.map((card, i) => (
-          <div key={i} className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1.25rem' }}>
-            <div style={{ background: `${card.color}15`, color: card.color, padding: '0.75rem', borderRadius: '10px' }}>
-              {card.icon}
+        let filteredInvoices = dealerInvoices.filter(inv => {
+          if (invoiceSearch && !inv.invoiceNumber.toLowerCase().includes(invoiceSearch.toLowerCase())) return false;
+          if (invoiceStatusFilter !== 'all' && inv.status !== invoiceStatusFilter) return false;
+          if (invoiceBrandFilter !== 'all' && inv.brand !== invoiceBrandFilter) return false;
+          if (isAllBills && invoiceDealerFilter !== 'all' && inv.dealerName !== invoiceDealerFilter) return false;
+          if (invoiceSalesTeamFilter !== 'all' && inv.salesTeam !== invoiceSalesTeamFilter) return false;
+          if (invoiceBeltFilter !== 'all' && inv.belt !== invoiceBeltFilter) return false;
+          if (invoiceMonthFilter !== 'all' && inv.month !== invoiceMonthFilter) return false;
+
+          const value = inv.invoiceValue || 0;
+          const balance = inv.balance !== undefined ? inv.balance : value;
+          if (invoiceBalanceStatusFilter === 'outstanding' && balance <= 0) return false;
+          if (invoiceBalanceStatusFilter === 'zero' && balance > 0) return false;
+
+          const overdueDays = calculateOverdueDays(inv.dateOfInvoice || inv.date);
+          if (invoiceOverdueFilter === 'overdue' && (overdueDays <= 0 || inv.status === 'Paid')) return false;
+          if (invoiceOverdueFilter === 'overdue_30' && (overdueDays <= 30 || inv.status === 'Paid')) return false;
+          if (invoiceOverdueFilter === 'overdue_60' && (overdueDays <= 60 || inv.status === 'Paid')) return false;
+          if (invoiceOverdueFilter === 'overdue_90' && (overdueDays <= 90 || inv.status === 'Paid')) return false;
+          if (invoiceOverdueFilter === 'not_overdue' && (overdueDays > 0 && inv.status !== 'Paid')) return false;
+
+          return true;
+        });
+
+        // Sorting logic
+        if (invoiceOverdueSort === 'asc') {
+          filteredInvoices.sort((a, b) => {
+            const overdueA = a.status === 'Paid' ? 0 : calculateOverdueDays(a.dateOfInvoice || a.date);
+            const overdueB = b.status === 'Paid' ? 0 : calculateOverdueDays(b.dateOfInvoice || b.date);
+            return overdueA - overdueB;
+          });
+        } else if (invoiceOverdueSort === 'desc') {
+          filteredInvoices.sort((a, b) => {
+            const overdueA = a.status === 'Paid' ? 0 : calculateOverdueDays(a.dateOfInvoice || a.date);
+            const overdueB = b.status === 'Paid' ? 0 : calculateOverdueDays(b.dateOfInvoice || b.date);
+            return overdueB - overdueA;
+          });
+        } else if (invoiceBalanceSort === 'asc') {
+          filteredInvoices.sort((a, b) => {
+            const balA = a.balance !== undefined ? a.balance : (a.invoiceValue || 0);
+            const balB = b.balance !== undefined ? b.balance : (b.invoiceValue || 0);
+            return balA - balB;
+          });
+        } else if (invoiceBalanceSort === 'desc') {
+          filteredInvoices.sort((a, b) => {
+            const balA = a.balance !== undefined ? a.balance : (a.invoiceValue || 0);
+            const balB = b.balance !== undefined ? b.balance : (b.invoiceValue || 0);
+            return balB - balA;
+          });
+        }
+
+        // Screen sums of all filtered invoices
+        const sumInvoicedValue = filteredInvoices.reduce((sum, inv) => sum + (inv.invoiceValue || 0), 0);
+        const sumOutstandingBalance = filteredInvoices.reduce((sum, inv) => sum + (inv.balance !== undefined ? inv.balance : inv.invoiceValue), 0);
+
+        // Selection logic
+        const selectedDealerInvoices = dealerInvoices.filter(inv => selectedInvoices[inv._id]);
+        const selectedBalance = selectedDealerInvoices.reduce((sum, inv) => sum + (inv.balance !== undefined ? inv.balance : inv.invoiceValue), 0);
+        const allDealerInvoicesSelected = filteredInvoices.length > 0 && filteredInvoices.every(inv => selectedInvoices[inv._id]);
+
+        // Filter for printing: Print ONLY selected bills if any are selected, otherwise print all filtered bills.
+        const printedInvoices = selectedDealerInvoices.length > 0
+          ? filteredInvoices.filter(inv => selectedInvoices[inv._id])
+          : filteredInvoices;
+
+        const printedTotalInvoiced = printedInvoices.reduce((sum, inv) => sum + (inv.invoiceValue || 0), 0);
+        const printedTotalOutstanding = printedInvoices.reduce((sum, inv) => sum + (inv.balance !== undefined ? inv.balance : inv.invoiceValue), 0);
+
+        const handleSelectAllToggle = () => {
+          if (allDealerInvoicesSelected) {
+            setSelectedInvoices(prev => {
+              const copy = { ...prev };
+              filteredInvoices.forEach(inv => {
+                delete copy[inv._id];
+              });
+              return copy;
+            });
+          } else {
+            setSelectedInvoices(prev => {
+              const copy = { ...prev };
+              filteredInvoices.forEach(inv => {
+                copy[inv._id] = true;
+              });
+              return copy;
+            });
+          }
+        };
+
+        const handleSharePDF = async () => {
+          setSharingPdf(true);
+          const element = document.querySelector('.print-only');
+          if (!element) {
+            setSharingPdf(false);
+            return;
+          }
+
+          // Create temporary clone to generate high quality rendering off-screen
+          const clone = element.cloneNode(true);
+          clone.classList.remove('print-only');
+          clone.style.display = 'block';
+          clone.style.position = 'absolute';
+          clone.style.left = '-9999px';
+          clone.style.top = '0';
+          clone.style.width = '800px';
+          clone.style.background = 'white';
+          document.body.appendChild(clone);
+
+          try {
+            const canvas = await html2canvas(clone, {
+              scale: 2,
+              useCORS: true,
+              logging: false
+            });
+            document.body.removeChild(clone);
+
+            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+            const pdf = new jsPDF({
+              orientation: 'portrait',
+              unit: 'mm',
+              format: 'a4'
+            });
+
+            const imgWidth = 210; // A4 size width in mm
+            const pageHeight = 297; // A4 size height in mm
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            let heightLeft = imgHeight;
+            let position = 0;
+
+            pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+
+            while (heightLeft >= 0) {
+              position = heightLeft - imgHeight;
+              pdf.addPage();
+              pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+              heightLeft -= pageHeight;
+            }
+
+            const pdfBlob = pdf.output('blob');
+            const targetName = isAllBills ? 'All_Dealers' : selectedDealer.replace(/\s+/g, '_');
+            const fileName = `Outstanding_Statement_${targetName}.pdf`;
+            const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+              await navigator.share({
+                files: [file],
+                title: 'Outstanding Statement',
+                text: `Please find attached the outstanding bills statement for ${isAllBills ? 'All Dealers' : selectedDealer}.`
+              });
+            } else {
+              pdf.save(fileName);
+              alert('Web Share API is not supported on this browser/device. The PDF statement has been downloaded to your device instead.');
+            }
+          } catch (error) {
+            console.error('Error generating or sharing PDF:', error);
+            alert('Failed to generate PDF. Please use the Print Statement button instead.');
+            if (document.body.contains(clone)) {
+              document.body.removeChild(clone);
+            }
+          } finally {
+            setSharingPdf(false);
+          }
+        };
+
+        return (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }} className="no-print">
+              <div>
+                <h1 className="page-title" style={{marginBottom: 0}}>Reports & Analytics</h1>
+                <p style={{ margin: '0.25rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                  Generate and print billing statements, outstanding balances, and sales team reports.
+                </p>
+              </div>
+              {(viewMode === 'all_bills' || selectedDealer) && (
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button 
+                    onClick={handlePrint}
+                    className="btn btn-secondary" 
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, padding: '0.5rem 1rem' }}
+                  >
+                    🖨️ Print
+                  </button>
+                  <button 
+                    onClick={handleSharePDF}
+                    className="btn btn-primary" 
+                    disabled={sharingPdf}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, padding: '0.5rem 1rem', opacity: sharingPdf ? 0.7 : 1 }}
+                  >
+                    {sharingPdf ? '⏳ Generating...' : '📤 Share PDF'}
+                  </button>
+                </div>
+              )}
             </div>
-            <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>{card.label}</div>
-              <div style={{ fontSize: '1.35rem', fontWeight: 800, color: card.color, marginTop: '0.2rem' }}>{card.value}</div>
+
+            {/* View Mode Toggle */}
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }} className="no-print">
+              <button
+                onClick={() => { setViewMode('dealers'); setSelectedDealer(''); }}
+                className={`btn ${viewMode === 'dealers' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ fontWeight: 600, gap: '0.35rem' }}
+              >
+                📂 Group by Dealers
+              </button>
+              <button
+                onClick={() => setViewMode('all_bills')}
+                className={`btn ${viewMode === 'all_bills' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ fontWeight: 600, gap: '0.35rem' }}
+              >
+                📄 View All Bills at Once
+              </button>
             </div>
-          </div>
-        ))}
-      </div>
 
-      {/* Tabs bar and Search bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', background: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }} className="no-print">
-        {/* Navigation tabs */}
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button 
-            onClick={() => { setActiveTab('aging'); setSearchQuery(''); }}
-            className={`btn ${activeTab === 'aging' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ fontWeight: 600, padding: '0.45rem 0.85rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            <Building2 size={16} />
-            Dealer Aging (Days)
-          </button>
-          <button 
-            onClick={() => { setActiveTab('brand'); setSearchQuery(''); }}
-            className={`btn ${activeTab === 'brand' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ fontWeight: 600, padding: '0.45rem 0.85rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            <Layers size={16} />
-            Brand-wise
-          </button>
-          <button 
-            onClick={() => { setActiveTab('month'); setSearchQuery(''); }}
-            className={`btn ${activeTab === 'month' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ fontWeight: 600, padding: '0.45rem 0.85rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            <Calendar size={16} />
-            Month-wise
-          </button>
-          <button 
-            onClick={() => { setActiveTab('team'); setSearchQuery(''); }}
-            className={`btn ${activeTab === 'team' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ fontWeight: 600, padding: '0.45rem 0.85rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            <Users size={16} />
-            Team-wise
-          </button>
-        </div>
+            {viewMode === 'dealers' && !selectedDealer ? (
+              /* Dealers List View */
+              <div className="no-print">
+                <div style={{ marginBottom: '1.25rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                  Select a dealer below to generate their outstanding bills statement.
+                </div>
 
-        {/* Search bar */}
-        <div style={{ position: 'relative', width: '100%', maxWidth: '280px' }}>
-          <span style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }}>
-            <Search size={16} />
-          </span>
-          <input 
-            type="text"
-            className="form-input"
-            style={{ paddingLeft: '2.25rem', paddingRight: '1rem', width: '100%', fontSize: '0.85rem', borderRadius: '8px' }}
-            placeholder={`Search ${activeTab === 'aging' ? 'dealer' : activeTab === 'brand' ? 'brand' : activeTab === 'month' ? 'month' : 'team'}...`}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-      </div>
+                {/* Dealer Filters Bar */}
+                <div style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '1rem',
+                  marginBottom: '1.5rem',
+                  background: '#f8fafc',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)',
+                  alignItems: 'center'
+                }}>
+                  <div style={{ flex: '1', minWidth: '200px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Search Dealer</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                      value={dealerSearch}
+                      onChange={e => setDealerSearch(e.target.value)}
+                      placeholder="Search by dealer name..."
+                    />
+                  </div>
+                  <div style={{ minWidth: '180px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Outstanding Balance</label>
+                    <select
+                      className="form-input"
+                      style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                      value={dealerBalanceFilter}
+                      onChange={e => setDealerBalanceFilter(e.target.value)}
+                    >
+                      <option value="all">All Dealers</option>
+                      <option value="outstanding">With Outstanding (&gt; ₹0)</option>
+                      <option value="zero">No Outstanding (₹0)</option>
+                    </select>
+                  </div>
+                  <div style={{ minWidth: '180px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Overdue Status</label>
+                    <select
+                      className="form-input"
+                      style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                      value={dealerOverdueFilter}
+                      onChange={e => setDealerOverdueFilter(e.target.value)}
+                    >
+                      <option value="all">All Dealers</option>
+                      <option value="has_overdue">With Overdue Bills</option>
+                      <option value="no_overdue">No Overdue Bills</option>
+                    </select>
+                  </div>
+                  {(dealerSearch || dealerBalanceFilter !== 'all' || dealerOverdueFilter !== 'all') && (
+                    <button
+                      className="btn btn-secondary"
+                      style={{ fontSize: '0.8rem', alignSelf: 'flex-end', height: '36px', padding: '0 1rem', display: 'inline-flex', alignItems: 'center' }}
+                      onClick={() => {
+                        setDealerSearch('');
+                        setDealerBalanceFilter('all');
+                        setDealerOverdueFilter('all');
+                      }}
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
 
-      {/* Main Report Table Area */}
-      <div id="print-section" className="card" style={{ padding: '1.25rem', background: 'white' }}>
-        
-        {/* Printable Title Block */}
-        <div style={{ display: 'none', marginBottom: '1.5rem' }} className="visible-print-only">
-          <h2 style={{ margin: 0 }}>SalesFlow Reports & Analytics</h2>
-          <p style={{ margin: '0.25rem 0', color: '#64748b' }}>
-            Report: {activeTab === 'aging' ? 'Dealer Aging Analysis' : activeTab === 'brand' ? 'Brand-wise Analysis' : activeTab === 'month' ? 'Month-wise Performance' : 'Sales Team Performance'}
-          </p>
-          <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>Generated on: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
-          <hr style={{ margin: '1rem 0', border: 'none', borderTop: '2px solid #cbd5e1' }} />
-        </div>
-
-        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          
-          {/* Aging Report Table */}
-          {activeTab === 'aging' && (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', minWidth: '800px' }}>
-              <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left' }}>
-                  <th style={{ padding: '0.75rem 1rem', fontWeight: 700 }}>Dealer Name</th>
-                  <th style={{ padding: '0.75rem 1rem', fontWeight: 700, textAlign: 'right' }}>0-30 Days Overdue</th>
-                  <th style={{ padding: '0.75rem 1rem', fontWeight: 700, textAlign: 'right' }}>31-60 Days Overdue</th>
-                  <th style={{ padding: '0.75rem 1rem', fontWeight: 700, textAlign: 'right' }}>61-90 Days Overdue</th>
-                  <th style={{ padding: '0.75rem 1rem', fontWeight: 700, textAlign: 'right' }}>&gt;90 Days Overdue</th>
-                  <th style={{ padding: '0.75rem 1rem', fontWeight: 700, textAlign: 'right', background: '#fef2f2', color: '#b91c1c' }}>Total Outstanding</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reportData.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>No dealer aging data found.</td>
-                  </tr>
+                {uniqueDealers.length === 0 ? (
+                  <div className="card" style={{textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)'}}>
+                    <div style={{fontSize: '2rem', marginBottom: '1rem'}}>📄</div>
+                    <div>No dealers found.</div>
+                  </div>
+                ) : filteredDealers.length === 0 ? (
+                  <div className="card" style={{textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)'}}>
+                    <div style={{fontSize: '2rem', marginBottom: '1rem'}}>🔍</div>
+                    <div>No dealers match your filter criteria.</div>
+                  </div>
                 ) : (
-                  <>
-                    {reportData.map((row, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--primary-color)' }}>{row.name}</td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>₹{row.outstanding_0_30.toLocaleString()}</td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>₹{row.outstanding_31_60.toLocaleString()}</td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>₹{row.outstanding_61_90.toLocaleString()}</td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: row.outstanding_90_plus > 0 ? '#b91c1c' : 'inherit', fontWeight: row.outstanding_90_plus > 0 ? 600 : 'normal' }}>
-                          ₹{row.outstanding_90_plus.toLocaleString()}
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, background: '#fffbeb', color: '#b91c1c' }}>
-                          ₹{row.totalOutstanding.toLocaleString()}
+                  <div>
+                    {/* Desktop View of Dealer Rows */}
+                    <div className="desktop-view">
+                      <div className="dealer-header-row" style={{ display: 'flex', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', borderBottom: '2px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '0.5rem' }}>
+                        <div style={{ flex: '2', minWidth: '240px' }}>Dealer Name</div>
+                        <div style={{ flex: '1', minWidth: '100px' }}>Total Bills</div>
+                        <div style={{ flex: '1', minWidth: '120px' }}>Overdue Bills</div>
+                        <div style={{ flex: '1.5', minWidth: '150px' }}>Active Selection</div>
+                        <div style={{ flex: '1.5', minWidth: '150px', textAlign: 'right' }}>Total Balance</div>
+                        <div style={{ width: '30px' }}></div>
+                      </div>
+
+                      <div className="dealers-rows-list">
+                        {filteredDealers.map(dealer => {
+                          const dealerInvoices = invoices.filter(inv => inv.dealerName === dealer);
+                          const totalOutstanding = calculateDealerTotalOutstanding(invoices, dealer);
+                          const overdueCount = countOverdueBills(invoices, dealer);
+                          const selectedDealerInvoices = dealerInvoices.filter(inv => selectedInvoices[inv._id]);
+                          const selectedBalance = selectedDealerInvoices.reduce((sum, inv) => sum + (inv.balance !== undefined ? inv.balance : inv.invoiceValue), 0);
+
+                          return (
+                            <div 
+                              key={dealer} 
+                              className="dealer-row" 
+                              onClick={() => setSelectedDealer(dealer)}
+                              style={{ background: 'white' }}
+                            >
+                              <div style={{ flex: '2', minWidth: '240px', fontWeight: 700, color: 'var(--primary-color)', fontSize: '0.95rem' }}>
+                                {dealer}
+                              </div>
+                              
+                              <div style={{ flex: '1', minWidth: '100px' }}>
+                                <span className="badge badge-neutral" style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}>
+                                  {dealerInvoices.length} Bills
+                                </span>
+                              </div>
+                              
+                              <div style={{ flex: '1', minWidth: '120px' }}>
+                                {overdueCount > 0 ? (
+                                  <span className="badge badge-danger" style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}>
+                                    {overdueCount} Overdue
+                                  </span>
+                                ) : (
+                                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>0 Overdue</span>
+                                )}
+                              </div>
+
+                              <div style={{ flex: '1.5', minWidth: '150px' }}>
+                                {selectedDealerInvoices.length > 0 ? (
+                                  <span className="badge badge-warning" style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
+                                    Selected: ₹{selectedBalance.toLocaleString()}
+                                  </span>
+                                ) : (
+                                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>-</span>
+                                )}
+                              </div>
+
+                              <div style={{ flex: '1.5', minWidth: '150px', textAlign: 'right', fontWeight: 700, color: totalOutstanding > 0 ? '#b91c1c' : '#15803d', fontSize: '1rem' }}>
+                                ₹{totalOutstanding.toLocaleString()}
+                              </div>
+                              
+                              <div style={{ width: '30px', textAlign: 'right', color: 'var(--text-secondary)', fontSize: '1rem' }} className="dealer-row-chevron">
+                                →
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Mobile View of Dealer Cards */}
+                    <div className="mobile-view">
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        {filteredDealers.map(dealer => {
+                          const dealerInvoices = invoices.filter(inv => inv.dealerName === dealer);
+                          const totalOutstanding = calculateDealerTotalOutstanding(invoices, dealer);
+                          const overdueCount = countOverdueBills(invoices, dealer);
+                          const selectedDealerInvoices = dealerInvoices.filter(inv => selectedInvoices[inv._id]);
+                          const selectedBalance = selectedDealerInvoices.reduce((sum, inv) => sum + (inv.balance !== undefined ? inv.balance : inv.invoiceValue), 0);
+
+                          return (
+                            <div 
+                              key={dealer} 
+                              className="mobile-card"
+                              onClick={() => setSelectedDealer(dealer)}
+                              style={{ cursor: 'pointer', marginBottom: 0 }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--primary-color)' }}>{dealer}</h3>
+                                <div className="dealer-row-chevron" style={{ color: 'var(--text-secondary)', fontSize: '1.2rem' }}>→</div>
+                              </div>
+                              
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                                <span className="badge badge-neutral" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}>{dealerInvoices.length} Bills</span>
+                                {overdueCount > 0 ? (
+                                  <span className="badge badge-danger" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}>{overdueCount} Overdue</span>
+                                ) : (
+                                  <span className="badge" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', background: '#f1f5f9', color: '#64748b' }}>0 Overdue</span>
+                                )}
+                                {selectedDealerInvoices.length > 0 && (
+                                  <span className="badge badge-warning" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
+                                    Selected: ₹{selectedBalance.toLocaleString()}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem', borderTop: '1px dashed var(--border-color)' }}>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Total Balance:</span>
+                                <span style={{ fontSize: '1.1rem', fontWeight: 800, color: totalOutstanding > 0 ? '#b91c1c' : '#15803d' }}>
+                                  ₹{totalOutstanding.toLocaleString()}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Selected Dealer / Global Bills report view */
+              <div>
+                {/* Back Navigation & Summary Header */}
+                <div style={{ marginBottom: '1.5rem' }} className="no-print">
+                  <button 
+                    className="btn btn-secondary" 
+                    onClick={() => { setSelectedDealer(''); setViewMode('dealers'); }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginBottom: '1.25rem', padding: '0.5rem 1rem' }}
+                  >
+                    ← Back to Dealers List
+                  </button>
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', background: '#f8fafc', padding: '1.25rem 1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                    <div>
+                      <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary-color)' }}>
+                        {isAllBills ? 'All Bills (Global Report)' : selectedDealer}
+                      </h2>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                        Showing {filteredInvoices.length} bills in this statement
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '2.5rem', alignItems: 'center' }}>
+                      {selectedDealerInvoices.length > 0 && (
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>Selected Balance</div>
+                          <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#b91c1c' }}>
+                            ₹{selectedBalance.toLocaleString()}
+                          </div>
+                        </div>
+                      )}
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>Total Balance</div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: 700, color: sumOutstandingBalance > 0 ? '#b91c1c' : '#15803d' }}>
+                          ₹{sumOutstandingBalance.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Invoices Filters Bar */}
+                <div style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '1rem',
+                  marginBottom: '1.25rem',
+                  background: '#f8fafc',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)',
+                  alignItems: 'center'
+                }} className="no-print">
+                  <div style={{ flex: '1', minWidth: '180px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Search Bill No.</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                      value={invoiceSearch}
+                      onChange={e => setInvoiceSearch(e.target.value)}
+                      placeholder="Search by bill number..."
+                    />
+                  </div>
+                  {isAllBills && (
+                    <div style={{ minWidth: '180px', flex: '1' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Dealer</label>
+                      <select
+                        className="form-input"
+                        style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                        value={invoiceDealerFilter}
+                        onChange={e => setInvoiceDealerFilter(e.target.value)}
+                      >
+                        <option value="all">All Dealers</option>
+                        {uniqueDealersList.map(dealer => (
+                          <option key={dealer} value={dealer}>{dealer}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <div style={{ minWidth: '130px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Status</label>
+                    <select
+                      className="form-input"
+                      style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                      value={invoiceStatusFilter}
+                      onChange={e => setInvoiceStatusFilter(e.target.value)}
+                    >
+                      <option value="all">All Statuses</option>
+                      <option value="Unpaid">Unpaid</option>
+                      <option value="Partial">Partial</option>
+                      <option value="Paid">Paid</option>
+                    </select>
+                  </div>
+                  <div style={{ minWidth: '130px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Sales Team</label>
+                    <select
+                      className="form-input"
+                      style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                      value={invoiceSalesTeamFilter}
+                      onChange={e => setInvoiceSalesTeamFilter(e.target.value)}
+                    >
+                      <option value="all">All Teams</option>
+                      {uniqueSalesTeamsList.map(team => (
+                        <option key={team} value={team}>{team}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ minWidth: '130px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Belt</label>
+                    <select
+                      className="form-input"
+                      style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                      value={invoiceBeltFilter}
+                      onChange={e => setInvoiceBeltFilter(e.target.value)}
+                    >
+                      <option value="all">All Belts</option>
+                      {uniqueBeltsList.map(belt => (
+                        <option key={belt} value={belt}>{belt}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ minWidth: '130px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Month</label>
+                    <select
+                      className="form-input"
+                      style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                      value={invoiceMonthFilter}
+                      onChange={e => setInvoiceMonthFilter(e.target.value)}
+                    >
+                      <option value="all">All Months</option>
+                      {uniqueMonthsList.map(m => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ minWidth: '130px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Balance</label>
+                    <select
+                      className="form-input"
+                      style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                      value={invoiceBalanceStatusFilter}
+                      onChange={e => setInvoiceBalanceStatusFilter(e.target.value)}
+                    >
+                      <option value="all">All Balances</option>
+                      <option value="outstanding">Outstanding (&gt; ₹0)</option>
+                      <option value="zero">Zero (₹0)</option>
+                    </select>
+                  </div>
+                  <div style={{ minWidth: '150px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Overdue Days</label>
+                    <select
+                      className="form-input"
+                      style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                      value={invoiceOverdueFilter}
+                      onChange={e => setInvoiceOverdueFilter(e.target.value)}
+                    >
+                      <option value="all">All Bills</option>
+                      <option value="overdue">Overdue (&gt; 0 Days)</option>
+                      <option value="overdue_30">Overdue &gt; 30 Days</option>
+                      <option value="overdue_60">Overdue &gt; 60 Days</option>
+                      <option value="overdue_90">Overdue &gt; 90 Days</option>
+                      <option value="not_overdue">Not Overdue</option>
+                    </select>
+                  </div>
+                  <div style={{ minWidth: '130px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Brand</label>
+                    <select
+                      className="form-input"
+                      style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                      value={invoiceBrandFilter}
+                      onChange={e => setInvoiceBrandFilter(e.target.value)}
+                    >
+                      <option value="all">All Brands</option>
+                      {uniqueBrands.map(brand => (
+                        <option key={brand} value={brand}>{brand}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ minWidth: '130px' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Sort Overdue</label>
+                    <select
+                      className="form-input"
+                      style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                      value={invoiceOverdueSort}
+                      onChange={e => {
+                        setInvoiceOverdueSort(e.target.value);
+                        setInvoiceBalanceSort('none');
+                      }}
+                  >
+                    <option value="none">No Sort</option>
+                    <option value="asc">Low to High</option>
+                    <option value="desc">High to Low</option>
+                  </select>
+                </div>
+                <div style={{ minWidth: '130px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Sort Balance</label>
+                  <select
+                    className="form-input"
+                    style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                    value={invoiceBalanceSort}
+                    onChange={e => {
+                      setInvoiceBalanceSort(e.target.value);
+                      setInvoiceOverdueSort('none');
+                    }}
+                  >
+                    <option value="none">No Sort</option>
+                    <option value="asc">Low to High</option>
+                    <option value="desc">High to Low</option>
+                  </select>
+                </div>
+                {(invoiceSearch || invoiceStatusFilter !== 'all' || invoiceOverdueFilter !== 'all' || invoiceBrandFilter !== 'all' || invoiceDealerFilter !== 'all' || invoiceSalesTeamFilter !== 'all' || invoiceBeltFilter !== 'all' || invoiceMonthFilter !== 'all' || invoiceBalanceStatusFilter !== 'all' || invoiceOverdueSort !== 'none' || invoiceBalanceSort !== 'none') && (
+                  <button
+                    className="btn btn-secondary"
+                    style={{ fontSize: '0.8rem', alignSelf: 'flex-end', height: '36px', padding: '0 1rem', display: 'inline-flex', alignItems: 'center' }}
+                    onClick={() => {
+                      setInvoiceSearch('');
+                      setInvoiceStatusFilter('all');
+                      setInvoiceOverdueFilter('all');
+                      setInvoiceBrandFilter('all');
+                      setInvoiceDealerFilter('all');
+                      setInvoiceSalesTeamFilter('all');
+                      setInvoiceBeltFilter('all');
+                      setInvoiceMonthFilter('all');
+                      setInvoiceBalanceStatusFilter('all');
+                      setInvoiceOverdueSort('none');
+                      setInvoiceBalanceSort('none');
+                    }}
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+
+              {/* Selection Summary Bar */}
+              {selectedDealerInvoices.length > 0 && (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  padding: '0.75rem 1rem',
+                  borderRadius: '8px',
+                  marginBottom: '1.25rem',
+                  flexWrap: 'wrap',
+                  gap: '1rem'
+                }} className="no-print">
+                  <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+                    <div>
+                      <span style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 600, textTransform: 'uppercase', display: 'block' }}>Selected Bills</span>
+                      <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#166534' }}>
+                        {selectedDealerInvoices.length} of {filteredInvoices.length}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 600, textTransform: 'uppercase', display: 'block' }}>Selected Balance</span>
+                      <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#b91c1c' }}>
+                        ₹{selectedBalance.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', borderColor: '#bbf7d0', background: 'white' }}
+                    onClick={() => {
+                      setSelectedInvoices(prev => {
+                        const copy = { ...prev };
+                        dealerInvoices.forEach(inv => {
+                          delete copy[inv._id];
+                        });
+                        return copy;
+                      });
+                    }}
+                  >
+                    Clear Selection
+                  </button>
+                </div>
+              )}
+
+              {/* Screen-Only Table (Interactive, with checkboxes) */}
+              <div className="card screen-only no-print" style={{ padding: '1.25rem', background: 'white' }}>
+                {/* Desktop View Table */}
+                <div className="desktop-view" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                  <table className="responsive-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left' }}>
+                        <th style={{ position: 'sticky', left: 0, background: '#f8fafc', zIndex: 10, padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, borderRight: '2px solid #e2e8f0', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.1)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={allDealerInvoicesSelected} 
+                              onChange={handleSelectAllToggle}
+                              style={{ cursor: 'pointer', width: '16px', height: '16px' }} 
+                            />
+                            <span>Dealer Name</span>
+                          </div>
+                        </th>
+                        <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Invoice Number</th>
+                        <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>Invoice Value</th>
+                        <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'center' }}>Overdue Days</th>
+                        <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>Balance</th>
+                        <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Brand</th>
+                        <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Date of Invoice</th>
+                        <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Sales Team</th>
+                        <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Belt</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredInvoices.length === 0 ? (
+                        <tr>
+                          <td colSpan="9" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                            No bills found.
+                          </td>
+                        </tr>
+                      ) : (
+                        <>
+                          {filteredInvoices.map((inv, idx) => {
+                            const value = inv.invoiceValue || 0;
+                            const balance = inv.balance !== undefined ? inv.balance : value;
+                            const overdue = calculateOverdueDays(inv.dateOfInvoice || inv.date);
+
+                            return (
+                              <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <td style={{ position: 'sticky', left: 0, background: 'white', zIndex: 10, padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--primary-color)', borderRight: '2px solid #e2e8f0', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.1)' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                    <input 
+                                      type="checkbox" 
+                                      checked={!!selectedInvoices[inv._id]} 
+                                      onChange={() => toggleInvoiceSelection(inv._id)}
+                                      style={{ cursor: 'pointer', width: '16px', height: '16px' }} 
+                                    />
+                                    <span>{inv.dealerName}</span>
+                                  </div>
+                                </td>
+                                <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{inv.invoiceNumber}</td>
+                                <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>₹{value.toLocaleString()}</td>
+                                <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 600, color: overdue > 0 && inv.status !== 'Paid' ? '#b91c1c' : '#64748b' }}>
+                                  {inv.status === 'Paid' ? 0 : overdue}
+                                </td>
+                                <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: balance > 0 ? '#b91c1c' : '#15803d' }}>₹{balance.toLocaleString()}</td>
+                                <td style={{ padding: '0.75rem 1rem' }}>{inv.brand || '-'}</td>
+                                <td style={{ padding: '0.75rem 1rem' }}>{new Date(inv.dateOfInvoice || inv.date).toLocaleDateString()}</td>
+                                <td style={{ padding: '0.75rem 1rem' }}>{inv.salesTeam || '-'}</td>
+                                <td style={{ padding: '0.75rem 1rem' }}>{inv.belt || '-'}</td>
+                              </tr>
+                            );
+                          })}
+                          
+                          {/* Screen Totals Row */}
+                          <tr style={{ background: '#f8fafc', fontWeight: 800, borderTop: '2px solid #e2e8f0' }}>
+                            <td style={{ padding: '0.75rem 1rem' }}>Total</td>
+                            <td></td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>₹{sumInvoicedValue.toLocaleString()}</td>
+                            <td></td>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: '#b91c1c' }}>₹{sumOutstandingBalance.toLocaleString()}</td>
+                            <td colSpan="4"></td>
+                          </tr>
+                        </>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile View Card List */}
+                <div className="mobile-view">
+                  {filteredInvoices.length === 0 ? (
+                    <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                      <div>No bills match your filter criteria.</div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      {filteredInvoices.map((inv, idx) => {
+                        const value = inv.invoiceValue || 0;
+                        const balance = inv.balance !== undefined ? inv.balance : value;
+                        const overdue = calculateOverdueDays(inv.dateOfInvoice || inv.date);
+
+                        return (
+                          <div 
+                            key={idx} 
+                            className="mobile-card" 
+                            style={{ 
+                              borderLeft: `4px solid ${inv.status === 'Paid' ? '#10b981' : inv.status === 'Partial' ? '#f59e0b' : '#ef4444'}`,
+                              padding: '1rem',
+                              marginBottom: 0
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <input 
+                                  type="checkbox" 
+                                  checked={!!selectedInvoices[inv._id]} 
+                                  onChange={() => toggleInvoiceSelection(inv._id)}
+                                  style={{ cursor: 'pointer', width: '18px', height: '18px' }} 
+                                />
+                                <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary-color)' }}>
+                                  No: {inv.invoiceNumber}
+                                </span>
+                              </div>
+                              <span className={`badge badge-${inv.status === 'Paid' ? 'success' : inv.status === 'Partial' ? 'warning' : 'danger'}`} style={{ fontSize: '0.65rem' }}>
+                                {inv.status}
+                              </span>
+                            </div>
+                            
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                              Dealer: <strong>{inv.dealerName}</strong>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem', background: '#f8fafc', padding: '0.5rem', borderRadius: '6px' }}>
+                              <div>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>VALUE</span>
+                                <div style={{ fontWeight: 600 }}>₹{value.toLocaleString()}</div>
+                              </div>
+                              <div>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>BALANCE</span>
+                                <div style={{ fontWeight: 700, color: balance > 0 ? '#b91c1c' : '#15803d' }}>₹{balance.toLocaleString()}</div>
+                              </div>
+                              <div>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>OVERDUE</span>
+                                <div style={{ fontWeight: 600 }}>{inv.status === 'Paid' ? 0 : overdue} Days</div>
+                              </div>
+                              <div>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>DATE</span>
+                                <div style={{ fontWeight: 600 }}>{new Date(inv.dateOfInvoice || inv.date).toLocaleDateString()}</div>
+                              </div>
+                              <div>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>BRAND</span>
+                                <div style={{ fontWeight: 600 }}>{inv.brand || '-'}</div>
+                              </div>
+                              <div>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>TEAM / BELT</span>
+                                <div style={{ fontWeight: 600 }}>{inv.salesTeam || '-'} / {inv.belt || '-'}</div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Print-Only Block (Prints ONLY selected bills, formats correctly for A4 portrait/landscape) */}
+              <div className="print-only">
+                <div style={{ marginBottom: '1.25rem', fontFamily: 'sans-serif' }}>
+                  <h2 style={{ margin: 0, fontSize: '1.3rem', color: '#0f172a', fontWeight: 700 }}>Outstanding Bills Statement</h2>
+                  <p style={{ margin: '0.25rem 0 0.75rem 0', color: '#475569', fontSize: '0.85rem' }}>
+                    Dealer: <strong>{isAllBills ? 'All Dealers' : selectedDealer}</strong>
+                  </p>
+                  
+                  <div style={{ display: 'flex', gap: '2rem', marginBottom: '1rem', borderBottom: '2px solid #94a3b8', paddingBottom: '0.5rem' }}>
+                    <div>
+                      <span style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, display: 'block' }}>Statement Date</span>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>{new Date().toLocaleDateString()}</span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, display: 'block' }}>Bills Printed</span>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>{printedInvoices.length} of {filteredInvoices.length}</span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, display: 'block' }}>Printed Outstanding</span>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#b91c1c' }}>₹{printedTotalOutstanding.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <table className="print-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '22%', textAlign: 'left' }}>Dealer Name</th>
+                      <th style={{ width: '13%', textAlign: 'left' }}>Invoice Number</th>
+                      <th style={{ width: '10%', textAlign: 'right' }}>Invoice Value</th>
+                      <th style={{ width: '8%', textAlign: 'center' }}>Overdue Days</th>
+                      <th style={{ width: '11%', textAlign: 'right' }}>Balance</th>
+                      <th style={{ width: '9%', textAlign: 'left' }}>Brand</th>
+                      <th style={{ width: '11%', textAlign: 'left' }}>Date</th>
+                      <th style={{ width: '9%', textAlign: 'left' }}>Sales Team</th>
+                      <th style={{ width: '7%', textAlign: 'left' }}>Belt</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {printedInvoices.length === 0 ? (
+                      <tr>
+                        <td colSpan="9" style={{ textAlign: 'center', padding: '2rem' }}>
+                          No bills selected to print.
                         </td>
                       </tr>
-                    ))}
-                    {/* Report Totals Row */}
-                    <tr style={{ background: '#f8fafc', fontWeight: 800, borderTop: '2px solid #e2e8f0' }}>
-                      <td style={{ padding: '0.75rem 1rem' }}>Total</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>₹{reportData.reduce((sum, r) => sum + r.outstanding_0_30, 0).toLocaleString()}</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>₹{reportData.reduce((sum, r) => sum + r.outstanding_31_60, 0).toLocaleString()}</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>₹{reportData.reduce((sum, r) => sum + r.outstanding_61_90, 0).toLocaleString()}</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: '#b91c1c' }}>₹{reportData.reduce((sum, r) => sum + r.outstanding_90_plus, 0).toLocaleString()}</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right', background: '#fee2e2', color: '#b91c1c' }}>
-                        ₹{reportData.reduce((sum, r) => sum + r.totalOutstanding, 0).toLocaleString()}
-                      </td>
-                    </tr>
-                  </>
-                )}
-              </tbody>
-            </table>
-          )}
+                    ) : (
+                      <>
+                        {printedInvoices.map((inv, idx) => {
+                          const value = inv.invoiceValue || 0;
+                          const balance = inv.balance !== undefined ? inv.balance : value;
+                          const overdue = calculateOverdueDays(inv.dateOfInvoice || inv.date);
 
-          {/* Brand/Month/Team Reports Template */}
-          {activeTab !== 'aging' && (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', minWidth: '700px' }}>
-              <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left' }}>
-                  <th style={{ padding: '0.75rem 1rem', fontWeight: 700 }}>
-                    {activeTab === 'brand' ? 'Brand Name' : activeTab === 'month' ? 'Month' : 'Sales Team'}
-                  </th>
-                  <th style={{ padding: '0.75rem 1rem', fontWeight: 700, textAlign: 'center' }}>Total Bills</th>
-                  <th style={{ padding: '0.75rem 1rem', fontWeight: 700, textAlign: 'right' }}>Total Invoiced Value</th>
-                  <th style={{ padding: '0.75rem 1rem', fontWeight: 700, textAlign: 'right', color: '#15803d' }}>Total Payments Collected</th>
-                  <th style={{ padding: '0.75rem 1rem', fontWeight: 700, textAlign: 'right', color: '#b91c1c' }}>Total Balance Outstanding</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reportData.length === 0 ? (
-                  <tr>
-                    <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>No report data found.</td>
-                  </tr>
-                ) : (
-                  <>
-                    {reportData.map((row, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--primary-color)' }}>{row.name}</td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>{row.invoiceCount}</td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>₹{row.totalValue.toLocaleString()}</td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: '#15803d', fontWeight: 500 }}>₹{row.totalReceived.toLocaleString()}</td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: '#b91c1c', fontWeight: 600 }}>₹{row.totalOutstanding.toLocaleString()}</td>
-                      </tr>
-                    ))}
-                    {/* Report Totals Row */}
-                    <tr style={{ background: '#f8fafc', fontWeight: 800, borderTop: '2px solid #e2e8f0' }}>
-                      <td style={{ padding: '0.75rem 1rem' }}>Total</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>{reportData.reduce((sum, r) => sum + r.invoiceCount, 0)}</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>₹{reportData.reduce((sum, r) => sum + r.totalValue, 0).toLocaleString()}</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: '#15803d' }}>₹{reportData.reduce((sum, r) => sum + r.totalReceived, 0).toLocaleString()}</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: '#b91c1c' }}>
-                        ₹{reportData.reduce((sum, r) => sum + r.totalOutstanding, 0).toLocaleString()}
-                      </td>
-                    </tr>
-                  </>
-                )}
-              </tbody>
-            </table>
-          )}
-
-        </div>
-      </div>
-      
-      {/* WhatsApp Modal */}
-      {showWhatsappModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.4)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 9999,
-          padding: '1rem'
-        }} className="no-print">
-          <div className="card" style={{
-            maxWidth: '500px',
-            width: '100%',
-            background: 'white',
-            borderRadius: '12px',
-            padding: '1.5rem',
-            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)'
-          }}>
-            <h3 style={{ margin: '0 0 0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#16a34a' }}>
-              <MessageCircle size={24} />
-              Share Report via WhatsApp
-            </h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 1rem 0', lineHeight: 1.4 }}>
-              Choose a format below to share. For PDF or JPG, it will download the file to your system, and then open WhatsApp where you can attach and send the file.
-            </p>
-            
-            <div style={{ marginBottom: '1.25rem' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>Format to Share</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.25rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer' }}>
-                  <input
-                    type="radio"
-                    name="shareFormat"
-                    value="text"
-                    checked={shareFormat === 'text'}
-                    onChange={() => setShareFormat('text')}
-                  />
-                  <span><strong>Monospaced Text:</strong> Send structured text table directly</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer' }}>
-                  <input
-                    type="radio"
-                    name="shareFormat"
-                    value="pdf"
-                    checked={shareFormat === 'pdf'}
-                    onChange={() => setShareFormat('pdf')}
-                  />
-                  <span><strong>PDF Document:</strong> Download report as PDF and share</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer' }}>
-                  <input
-                    type="radio"
-                    name="shareFormat"
-                    value="jpg"
-                    checked={shareFormat === 'jpg'}
-                    onChange={() => setShareFormat('jpg')}
-                  />
-                  <span><strong>JPG Image:</strong> Download report as JPG image and share</span>
-                </label>
+                          return (
+                            <tr key={idx}>
+                              <td style={{ fontWeight: 700 }}>{inv.dealerName}</td>
+                              <td style={{ fontWeight: 600 }}>{inv.invoiceNumber}</td>
+                              <td style={{ textAlign: 'right' }}>₹{value.toLocaleString()}</td>
+                              <td style={{ textAlign: 'center', fontWeight: 600, color: overdue > 0 && inv.status !== 'Paid' ? '#b91c1c' : 'black' }}>
+                                {inv.status === 'Paid' ? 0 : overdue}
+                              </td>
+                              <td style={{ textAlign: 'right', fontWeight: 700 }}>₹{balance.toLocaleString()}</td>
+                              <td>{inv.brand || '-'}</td>
+                              <td>{new Date(inv.dateOfInvoice || inv.date).toLocaleDateString()}</td>
+                              <td>{inv.salesTeam || '-'}</td>
+                              <td>{inv.belt || '-'}</td>
+                            </tr>
+                          );
+                        })}
+                        <tr style={{ fontWeight: 800, background: '#f8fafc' }}>
+                          <td colSpan="2">Total</td>
+                          <td style={{ textAlign: 'right' }}>₹{printedTotalInvoiced.toLocaleString()}</td>
+                          <td></td>
+                          <td style={{ textAlign: 'right', color: '#b91c1c' }}>₹{printedTotalOutstanding.toLocaleString()}</td>
+                          <td colSpan="4"></td>
+                        </tr>
+                      </>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
-
-            <div style={{ marginBottom: '1.25rem' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.35rem' }}>Phone Number (Optional)</label>
-              <input
-                type="tel"
-                className="form-input"
-                placeholder="e.g. 919876543210"
-                style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px', fontSize: '0.9rem' }}
-                value={whatsappNumber}
-                onChange={e => setWhatsappNumber(e.target.value.replace(/[^0-9]/g, ''))}
-              />
-            </div>
-            
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-              <button
-                className="btn btn-secondary"
-                style={{ padding: '0.5rem 1rem' }}
-                onClick={() => {
-                  setShowWhatsappModal(false);
-                  setWhatsappNumber('');
-                  setShareFormat('text');
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn btn-primary"
-                style={{ background: '#16a34a', borderColor: '#16a34a', color: 'white', padding: '0.5rem 1rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-                onClick={handleShareToWhatsapp}
-              >
-                Download & Share
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* CSS styling for printing display helper */}
-      <style>{`
-        @media screen {
-          .visible-print-only {
-            display: none !important;
-          }
-        }
-        @media print {
-          .visible-print-only {
-            display: block !important;
-          }
-        }
-      `}</style>
+          )}
+          </>
+        );
+      })()}
     </div>
   );
 };
 
 export default Reports;
+
+
+
