@@ -339,3 +339,58 @@ export const deleteCatalogue = async (id) => {
   }
 };
 
+let mockPriceLists = [];
+
+export const getPriceLists = async () => {
+  try {
+    const res = await axios.get(`${API_URL}/price-lists`);
+    return res.data;
+  } catch (error) {
+    console.warn("Backend unavailable, using mock price lists");
+    return mockPriceLists.map(c => {
+      const copy = { ...c };
+      delete copy.fileData;
+      return copy;
+    });
+  }
+};
+
+export const getPriceListById = async (id) => {
+  try {
+    const res = await axios.get(`${API_URL}/price-lists/${id}`);
+    return res.data;
+  } catch (error) {
+    const found = mockPriceLists.find(c => c._id === id);
+    if (!found) throw new Error("Price list not found");
+    return found;
+  }
+};
+
+export const createPriceList = async (data) => {
+  try {
+    const res = await axios.post(`${API_URL}/price-lists`, data);
+    return res.data;
+  } catch (error) {
+    const newPriceList = {
+      ...data,
+      _id: Date.now().toString(),
+      createdAt: new Date().toISOString()
+    };
+    mockPriceLists.unshift(newPriceList);
+    const responseData = { ...newPriceList };
+    delete responseData.fileData;
+    return responseData;
+  }
+};
+
+export const deletePriceList = async (id) => {
+  try {
+    const res = await axios.delete(`${API_URL}/price-lists/${id}`);
+    return res.data;
+  } catch (error) {
+    mockPriceLists = mockPriceLists.filter(c => c._id !== id);
+    return { message: "Price list deleted successfully" };
+  }
+};
+
+

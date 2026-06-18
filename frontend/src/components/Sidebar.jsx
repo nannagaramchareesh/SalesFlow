@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, FileText, IndianRupee, RotateCcw, Camera, Users, BarChart3, Bell, BookOpen } from 'lucide-react';
+import { LayoutDashboard, FileText, IndianRupee, RotateCcw, Camera, Users, BarChart3, Bell, BookOpen, FileSpreadsheet } from 'lucide-react';
 import './Sidebar.css';
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
@@ -45,6 +45,10 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
           <NavLink to="/catalogues" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
             <BookOpen size={20} />
             <span>Catalogues</span>
+          </NavLink>
+          <NavLink to="/price-lists" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
+            <FileSpreadsheet size={20} />
+            <span>Price Lists</span>
           </NavLink>
           <NavLink to="/alerts" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
             <Bell size={20} />

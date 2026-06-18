@@ -9,6 +9,7 @@ import DealersMaster from './pages/DealersMaster';
 import Reports from './pages/Reports';
 import AlertsSettings from './pages/AlertsSettings';
 import Catalogues from './pages/Catalogues';
+import PriceLists from './pages/PriceLists';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
           <Route path="reports" element={<Reports />} />
           <Route path="alerts" element={<AlertsSettings />} />
           <Route path="catalogues" element={<Catalogues />} />
+          <Route path="price-lists" element={<PriceLists />} />
         </Route>
       </Routes>
     </BrowserRouter>
