@@ -20,6 +20,8 @@ app.use('/api/invoices', require('./routes/invoices'));
 app.use('/api/collections', require('./routes/collections'));
 app.use('/api/returns', require('./routes/returns'));
 app.use('/api/dealers', require('./routes/dealers'));
+app.use('/api/catalogues', require('./routes/catalogues'));
+
 
 // Basic route
 app.get('/', (req, res) => {

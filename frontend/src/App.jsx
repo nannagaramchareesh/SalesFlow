@@ -8,6 +8,7 @@ import InvoiceImage from './pages/InvoiceImage';
 import DealersMaster from './pages/DealersMaster';
 import Reports from './pages/Reports';
 import AlertsSettings from './pages/AlertsSettings';
+import Catalogues from './pages/Catalogues';
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
           <Route path="dealers" element={<DealersMaster />} />
           <Route path="reports" element={<Reports />} />
           <Route path="alerts" element={<AlertsSettings />} />
+          <Route path="catalogues" element={<Catalogues />} />
         </Route>
       </Routes>
     </BrowserRouter>

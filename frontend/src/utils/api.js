@@ -284,3 +284,58 @@ export const deleteDealer = async (id) => {
     throw error;
   }
 };
+
+let mockCatalogues = [];
+
+export const getCatalogues = async () => {
+  try {
+    const res = await axios.get(`${API_URL}/catalogues`);
+    return res.data;
+  } catch (error) {
+    console.warn("Backend unavailable, using mock catalogues");
+    return mockCatalogues.map(c => {
+      const copy = { ...c };
+      delete copy.fileData;
+      return copy;
+    });
+  }
+};
+
+export const getCatalogueById = async (id) => {
+  try {
+    const res = await axios.get(`${API_URL}/catalogues/${id}`);
+    return res.data;
+  } catch (error) {
+    const found = mockCatalogues.find(c => c._id === id);
+    if (!found) throw new Error("Catalogue not found");
+    return found;
+  }
+};
+
+export const createCatalogue = async (data) => {
+  try {
+    const res = await axios.post(`${API_URL}/catalogues`, data);
+    return res.data;
+  } catch (error) {
+    const newCat = {
+      ...data,
+      _id: Date.now().toString(),
+      createdAt: new Date().toISOString()
+    };
+    mockCatalogues.unshift(newCat);
+    const responseData = { ...newCat };
+    delete responseData.fileData;
+    return responseData;
+  }
+};
+
+export const deleteCatalogue = async (id) => {
+  try {
+    const res = await axios.delete(`${API_URL}/catalogues/${id}`);
+    return res.data;
+  } catch (error) {
+    mockCatalogues = mockCatalogues.filter(c => c._id !== id);
+    return { message: "Catalogue deleted successfully" };
+  }
+};
+

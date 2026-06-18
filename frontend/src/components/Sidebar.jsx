@@ -1,12 +1,12 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, FileText, IndianRupee, RotateCcw, Camera, Users, BarChart3, Bell } from 'lucide-react';
+import { LayoutDashboard, FileText, IndianRupee, RotateCcw, Camera, Users, BarChart3, Bell, BookOpen } from 'lucide-react';
 import './Sidebar.css';
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
   return (
     <>
-      <div 
-        className={`sidebar-overlay ${isOpen ? 'open' : ''}`} 
+      <div
+        className={`sidebar-overlay ${isOpen ? 'open' : ''}`}
         onClick={() => setIsOpen(false)}
       />
       <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
@@ -20,7 +20,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
           </NavLink>
           <NavLink to="/data-entry" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
             <FileText size={20} />
-            <span>Data Entry</span>
+            <span>Invoice Entry</span>
           </NavLink>
           <NavLink to="/collections" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
             <IndianRupee size={20} />
@@ -28,11 +28,11 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
           </NavLink>
           <NavLink to="/returns" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
             <RotateCcw size={20} />
-            <span>Returns</span>
+            <span>Returns Entry</span>
           </NavLink>
           <NavLink to="/invoice-image" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
             <Camera size={20} />
-            <span>Invoice Image</span>
+            <span>Invoice Image Search</span>
           </NavLink>
           <NavLink to="/dealers" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
             <Users size={20} />
@@ -42,33 +42,13 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
             <BarChart3 size={20} />
             <span>Reports</span>
           </NavLink>
-          <NavLink to="/alerts" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
-            <Bell size={20} />
-            <span>Alerts & Rules</span>
-          </NavLink>
-          <NavLink to="/alerts" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
-            <Bell size={20} />
+          <NavLink to="/catalogues" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
+            <BookOpen size={20} />
             <span>Catalogues</span>
           </NavLink>
           <NavLink to="/alerts" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
             <Bell size={20} />
-            <span>Price Lists</span>
-          </NavLink>
-          <NavLink to="/alerts" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
-            <Bell size={20} />
-            <span>Credit notes, Sales Returns & Debit Notes</span>
-          </NavLink>
-          <NavLink to="/alerts" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
-            <Bell size={20} />
-            <span>Schemes</span>
-          </NavLink>
-          <NavLink to="/alerts" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
-            <Bell size={20} />
-            <span>Stock</span>
-          </NavLink>
-          <NavLink to="/alerts" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
-            <Bell size={20} />
-            <span>Cheques</span>
+            <span>Alerts & Rules</span>
           </NavLink>
         </nav>
       </aside>
