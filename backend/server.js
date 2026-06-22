@@ -22,6 +22,9 @@ app.use('/api/returns', require('./routes/returns'));
 app.use('/api/dealers', require('./routes/dealers'));
 app.use('/api/catalogues', require('./routes/catalogues'));
 app.use('/api/price-lists', require('./routes/priceLists'));
+app.use('/api/notes', require('./routes/notes'));
+app.use('/api/schemes', require('./routes/schemes'));
+app.use('/api/stocks', require('./routes/stocks'));
 
 
 // Basic route

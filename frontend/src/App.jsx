@@ -10,6 +10,9 @@ import Reports from './pages/Reports';
 import AlertsSettings from './pages/AlertsSettings';
 import Catalogues from './pages/Catalogues';
 import PriceLists from './pages/PriceLists';
+import CreditDebitNotes from './pages/CreditDebitNotes';
+import Schemes from './pages/Schemes';
+import Stock from './pages/Stock';
 
 function App() {
   return (
@@ -26,6 +29,9 @@ function App() {
           <Route path="alerts" element={<AlertsSettings />} />
           <Route path="catalogues" element={<Catalogues />} />
           <Route path="price-lists" element={<PriceLists />} />
+          <Route path="credit-debit-notes" element={<CreditDebitNotes />} />
+          <Route path="schemes" element={<Schemes />} />
+          <Route path="stock" element={<Stock />} />
         </Route>
       </Routes>
     </BrowserRouter>

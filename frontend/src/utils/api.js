@@ -393,4 +393,166 @@ export const deletePriceList = async (id) => {
   }
 };
 
+let mockNotes = [];
+
+export const getNotes = async () => {
+  try {
+    const res = await axios.get(`${API_URL}/notes`);
+    return res.data;
+  } catch (error) {
+    console.warn("Backend unavailable, using mock notes");
+    return mockNotes.map(c => {
+      const copy = { ...c };
+      delete copy.fileData;
+      return copy;
+    });
+  }
+};
+
+export const getNoteById = async (id) => {
+  try {
+    const res = await axios.get(`${API_URL}/notes/${id}`);
+    return res.data;
+  } catch (error) {
+    const found = mockNotes.find(c => c._id === id);
+    if (!found) throw new Error("Note not found");
+    return found;
+  }
+};
+
+export const createNote = async (data) => {
+  try {
+    const res = await axios.post(`${API_URL}/notes`, data);
+    return res.data;
+  } catch (error) {
+    const newNote = {
+      ...data,
+      _id: Date.now().toString(),
+      createdAt: new Date().toISOString()
+    };
+    mockNotes.unshift(newNote);
+    const responseData = { ...newNote };
+    delete responseData.fileData;
+    return responseData;
+  }
+};
+
+export const deleteNote = async (id) => {
+  try {
+    const res = await axios.delete(`${API_URL}/notes/${id}`);
+    return res.data;
+  } catch (error) {
+    mockNotes = mockNotes.filter(c => c._id !== id);
+    return { message: "Note deleted successfully" };
+  }
+};
+
+let mockSchemes = [];
+
+export const getSchemes = async () => {
+  try {
+    const res = await axios.get(`${API_URL}/schemes`);
+    return res.data;
+  } catch (error) {
+    console.warn("Backend unavailable, using mock schemes");
+    return mockSchemes.map(c => {
+      const copy = { ...c };
+      delete copy.fileData;
+      return copy;
+    });
+  }
+};
+
+export const getSchemeById = async (id) => {
+  try {
+    const res = await axios.get(`${API_URL}/schemes/${id}`);
+    return res.data;
+  } catch (error) {
+    const found = mockSchemes.find(c => c._id === id);
+    if (!found) throw new Error("Scheme not found");
+    return found;
+  }
+};
+
+export const createScheme = async (data) => {
+  try {
+    const res = await axios.post(`${API_URL}/schemes`, data);
+    return res.data;
+  } catch (error) {
+    const newScheme = {
+      ...data,
+      _id: Date.now().toString(),
+      createdAt: new Date().toISOString()
+    };
+    mockSchemes.unshift(newScheme);
+    const responseData = { ...newScheme };
+    delete responseData.fileData;
+    return responseData;
+  }
+};
+
+export const deleteScheme = async (id) => {
+  try {
+    const res = await axios.delete(`${API_URL}/schemes/${id}`);
+    return res.data;
+  } catch (error) {
+    mockSchemes = mockSchemes.filter(c => c._id !== id);
+    return { message: "Scheme deleted successfully" };
+  }
+};
+
+let mockStocks = [];
+
+export const getStocks = async () => {
+  try {
+    const res = await axios.get(`${API_URL}/stocks`);
+    return res.data;
+  } catch (error) {
+    console.warn("Backend unavailable, using mock stocks");
+    return mockStocks.map(c => {
+      const copy = { ...c };
+      delete copy.fileData;
+      return copy;
+    });
+  }
+};
+
+export const getStockById = async (id) => {
+  try {
+    const res = await axios.get(`${API_URL}/stocks/${id}`);
+    return res.data;
+  } catch (error) {
+    const found = mockStocks.find(c => c._id === id);
+    if (!found) throw new Error("Stock not found");
+    return found;
+  }
+};
+
+export const createStock = async (data) => {
+  try {
+    const res = await axios.post(`${API_URL}/stocks`, data);
+    return res.data;
+  } catch (error) {
+    const newStock = {
+      ...data,
+      _id: Date.now().toString(),
+      createdAt: new Date().toISOString()
+    };
+    mockStocks.unshift(newStock);
+    const responseData = { ...newStock };
+    delete responseData.fileData;
+    return responseData;
+  }
+};
+
+export const deleteStock = async (id) => {
+  try {
+    const res = await axios.delete(`${API_URL}/stocks/${id}`);
+    return res.data;
+  } catch (error) {
+    mockStocks = mockStocks.filter(c => c._id !== id);
+    return { message: "Stock deleted successfully" };
+  }
+};
+
 
