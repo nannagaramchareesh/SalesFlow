@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getPriceLists, getPriceListById, createPriceList, deletePriceList } from '../utils/api';
-import { FileSpreadsheet, FileText, Trash2, Search, FileUp, Eye, Download, RefreshCw, X, File } from 'lucide-react';
+import { FileSpreadsheet, FileText, Trash2, Search, FileUp, Eye, Download, RefreshCw, X, File, FileImage, Image } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const PriceLists = () => {
@@ -9,6 +9,7 @@ const PriceLists = () => {
   const [uploading, setUploading] = useState(false);
   const [viewLoading, setViewLoading] = useState(null);
   const [selectedExcel, setSelectedExcel] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
   
   // Form State
   const [name, setName] = useState('');
@@ -43,19 +44,13 @@ const PriceLists = () => {
       return;
     }
     
-    // Check file size (limit to 10MB)
-    if (selected.size > 10 * 1024 * 1024) {
-      setFileError('File size must be less than 10MB');
-      setFile(null);
-      e.target.value = null;
-      return;
-    }
+    // Validate file type by extension
     
     // Validate file type by extension
     const extension = selected.name.split('.').pop().toLowerCase();
-    const validExtensions = ['pdf', 'xls', 'xlsx', 'csv'];
+    const validExtensions = ['pdf', 'xls', 'xlsx', 'csv', 'jpg', 'jpeg', 'png', 'webp', 'gif'];
     if (!validExtensions.includes(extension)) {
-      setFileError('Only PDF and Excel (.xls, .xlsx, .csv) files are supported');
+      setFileError('Unsupported file type. Please upload a PDF, Excel spreadsheet, or Image.');
       setFile(null);
       e.target.value = null;
       return;
@@ -180,7 +175,8 @@ const PriceLists = () => {
         uInt8Array[i] = raw.charCodeAt(i);
       }
       
-      if (contentType.includes('pdf') || fullPriceList.fileName.toLowerCase().endsWith('.pdf')) {
+      const ext = fullPriceList.fileName.toLowerCase().split('.').pop();
+      if (ext === 'pdf') {
         const blob = new Blob([uInt8Array], { type: contentType });
         const blobUrl = URL.createObjectURL(blob);
         const win = window.open();
@@ -192,8 +188,11 @@ const PriceLists = () => {
         } else {
           window.open(blobUrl, '_blank');
         }
+      } else if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext) || contentType.startsWith('image/')) {
+        const blob = new Blob([uInt8Array], { type: contentType });
+        const blobUrl = URL.createObjectURL(blob);
+        setSelectedImage({ name: fullPriceList.name, url: blobUrl });
       } else {
-        // Parse Excel/CSV
         const wb = XLSX.read(uInt8Array, { type: 'array' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
@@ -217,11 +216,15 @@ const PriceLists = () => {
     const matchesSearch = pl.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           pl.fileName.toLowerCase().includes(searchQuery.toLowerCase());
     
+    const ext = pl.fileName.toLowerCase().split('.').pop();
     if (typeFilter === 'pdf') {
-      return matchesSearch && pl.fileName.toLowerCase().endsWith('.pdf');
+      return matchesSearch && ext === 'pdf';
     }
     if (typeFilter === 'excel') {
-      return matchesSearch && isExcel(pl.fileName);
+      return matchesSearch && ['xls', 'xlsx', 'csv'].includes(ext);
+    }
+    if (typeFilter === 'image') {
+      return matchesSearch && ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext);
     }
     return matchesSearch;
   });
@@ -261,14 +264,14 @@ const PriceLists = () => {
               </div>
 
               <div className="form-group">
-                <label>Choose Excel or PDF File (Max 10MB)</label>
+                <label>Choose Excel, PDF or Image File</label>
                 <div style={{ position: 'relative' }}>
                   <input
                     id="pricelist-file-input"
                     type="file"
                     className="form-input"
                     onChange={handleFileChange}
-                    accept=".pdf, .xls, .xlsx, .csv"
+                    accept=".pdf, .xls, .xlsx, .csv, image/*"
                     required
                     style={{ padding: '0.65rem' }}
                   />
@@ -347,6 +350,13 @@ const PriceLists = () => {
               >
                 Excel Sheets
               </button>
+              <button
+                className={`btn ${typeFilter === 'image' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ fontSize: '0.8rem', padding: '0.45rem 1rem' }}
+                onClick={() => setTypeFilter('image')}
+              >
+                Images
+              </button>
             </div>
           </div>
 
@@ -367,7 +377,29 @@ const PriceLists = () => {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
               {filteredPriceLists.map((pl) => {
-                const isPdfFile = pl.fileName.toLowerCase().endsWith('.pdf');
+                const ext = pl.fileName.toLowerCase().split('.').pop();
+                const isPdfFile = ext === 'pdf';
+                const isExcelFile = ['xls', 'xlsx', 'csv'].includes(ext);
+
+                let iconColor = '#10b981';
+                let iconBg = '#ecfdf5';
+                let iconElement = <FileSpreadsheet size={22} />;
+                let typeText = 'Excel Spreadsheet';
+                let borderCol = '#10b981';
+
+                if (isPdfFile) {
+                  iconColor = '#ef4444';
+                  iconBg = '#fef2f2';
+                  iconElement = <FileText size={22} />;
+                  typeText = 'PDF Document';
+                  borderCol = '#ef4444';
+                } else if (!isExcelFile) {
+                  iconColor = '#8b5cf6';
+                  iconBg = '#faf5ff';
+                  iconElement = <FileImage size={22} />;
+                  typeText = 'Image File';
+                  borderCol = '#8b5cf6';
+                }
                 
                 return (
                   <div 
@@ -379,7 +411,7 @@ const PriceLists = () => {
                       flexDirection: 'column', 
                       justifyContent: 'space-between',
                       transition: 'all 0.2s',
-                      borderLeft: `4px solid ${isPdfFile ? '#ef4444' : '#10b981'}`
+                      borderLeft: `4px solid ${borderCol}`
                     }}
                   >
                     <div>
@@ -391,10 +423,10 @@ const PriceLists = () => {
                           display: 'flex', 
                           alignItems: 'center', 
                           justifyContent: 'center',
-                          background: isPdfFile ? '#fef2f2' : '#ecfdf5',
-                          color: isPdfFile ? '#ef4444' : '#10b981'
+                          background: iconBg,
+                          color: iconColor
                         }}>
-                          {isPdfFile ? <FileText size={22} /> : <FileSpreadsheet size={22} />}
+                          {iconElement}
                         </div>
                         <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                           <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }} title={pl.name}>
@@ -409,7 +441,7 @@ const PriceLists = () => {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.8rem', background: '#f8fafc', padding: '0.75rem', borderRadius: '6px', marginBottom: '1.25rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: 'var(--text-secondary)' }}>File Type:</span>
-                          <span style={{ fontWeight: 600 }}>{isPdfFile ? 'PDF Document' : 'Excel Sheet'}</span>
+                          <span style={{ fontWeight: 600 }}>{typeText}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: 'var(--text-secondary)' }}>Uploaded:</span>
@@ -504,6 +536,29 @@ const PriceLists = () => {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Preview Modal Overlay */}
+      {selectedImage && (
+        <div className="modal-overlay" onClick={() => setSelectedImage(null)}>
+          <div className="modal-content" style={{ maxWidth: '800px', width: '90%' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <h3>{selectedImage.name}</h3>
+              </div>
+              <button className="modal-close-btn" onClick={() => setSelectedImage(null)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ textAlign: 'center', background: '#0f172a', padding: '1rem', display: 'flex', justifyContent: 'center', alignItems: 'center', maxHeight: '70vh' }}>
+              <img 
+                src={selectedImage.url} 
+                alt={selectedImage.name} 
+                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '4px' }} 
+              />
             </div>
           </div>
         </div>

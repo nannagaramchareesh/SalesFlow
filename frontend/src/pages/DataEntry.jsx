@@ -422,7 +422,7 @@ const DataEntry = () => {
                   Click to upload Excel Spreadsheet
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                  Supports .xlsx, .xls, .csv up to 10MB
+                  Supports .xlsx, .xls, .csv
                 </div>
               </div>
             ) : (

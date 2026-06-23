@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getCatalogues, getCatalogueById, createCatalogue, deleteCatalogue } from '../utils/api';
-import { BookOpen, FileText, Image, Trash2, Search, FileUp, Eye, X, RefreshCw, Download } from 'lucide-react';
+import { BookOpen, FileText, Image, Trash2, Search, FileUp, Eye, X, RefreshCw, Download, FileSpreadsheet, FileImage } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 const Catalogues = () => {
   const [catalogues, setCatalogues] = useState([]);
@@ -15,10 +16,11 @@ const Catalogues = () => {
   
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all'); // all, pdf, image
+  const [typeFilter, setTypeFilter] = useState('all'); // all, pdf, image, excel
   
   // Preview Modal State
   const [selectedView, setSelectedView] = useState(null); // { url, name, type }
+  const [selectedExcel, setSelectedExcel] = useState(null); // { name, data }
 
   useEffect(() => {
     fetchData();
@@ -34,9 +36,7 @@ const Catalogues = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleFileChange = (e) => {
+  };  const handleFileChange = (e) => {
     const selected = e.target.files[0];
     setFileError('');
     if (!selected) {
@@ -44,25 +44,16 @@ const Catalogues = () => {
       return;
     }
     
-    // Check file size (e.g. limit to 10MB)
-    if (selected.size > 10 * 1024 * 1024) {
-      setFileError('File size must be less than 10MB');
-      setFile(null);
-      e.target.value = null;
-      return;
-    }
-    
-    // Validate file type
-    const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (!validTypes.includes(selected.type)) {
-      setFileError('Only PDF and Image files are supported');
+    const extension = selected.name.split('.').pop().toLowerCase();
+    const validExtensions = ['pdf', 'xls', 'xlsx', 'csv', 'jpg', 'jpeg', 'png', 'webp', 'gif'];
+    if (!validExtensions.includes(extension)) {
+      setFileError('Unsupported file type. Please upload a PDF, Excel spreadsheet, or Image.');
       setFile(null);
       e.target.value = null;
       return;
     }
     
     setFile(selected);
-    // Auto-fill name if empty
     if (!name) {
       const cleanName = selected.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, ' ');
       setName(cleanName);
@@ -72,7 +63,7 @@ const Catalogues = () => {
   const handleUploadSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim()) {
-      alert('Please enter a name for the catalogue.');
+      alert('Please enter a name.');
       return;
     }
     if (!file) {
@@ -82,7 +73,6 @@ const Catalogues = () => {
 
     setUploading(true);
     
-    // Convert file to Base64
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = async () => {
@@ -96,17 +86,15 @@ const Catalogues = () => {
         
         await createCatalogue(payload);
         
-        // Reset form
         setName('');
         setFile(null);
         const fileInput = document.getElementById('catalogue-file-input');
         if (fileInput) fileInput.value = null;
         
-        // Refresh catalogues list
         await fetchData();
       } catch (error) {
-        console.error('Error uploading catalogue:', error);
-        alert('Failed to upload catalogue.');
+        console.error('Error uploading:', error);
+        alert('Failed to upload.');
       } finally {
         setUploading(false);
       }
@@ -125,8 +113,8 @@ const Catalogues = () => {
       await deleteCatalogue(id);
       setCatalogues(prev => prev.filter(c => c._id !== id));
     } catch (error) {
-      console.error('Error deleting catalogue:', error);
-      alert('Failed to delete catalogue.');
+      console.error('Error deleting:', error);
+      alert('Failed to delete.');
     }
   };
 
@@ -146,11 +134,11 @@ const Catalogues = () => {
         uInt8Array[i] = raw.charCodeAt(i);
       }
       
+      const ext = fullCatalog.fileName.toLowerCase().split('.').pop();
       const blob = new Blob([uInt8Array], { type: contentType });
       const blobUrl = URL.createObjectURL(blob);
       
-      if (contentType.includes('pdf')) {
-        // Open PDF in a new tab for native responsive pdf rendering
+      if (ext === 'pdf') {
         const win = window.open();
         if (win) {
           win.document.write(
@@ -158,21 +146,24 @@ const Catalogues = () => {
           );
           win.document.title = fullCatalog.name;
         } else {
-          // Fallback if popup blocker hits
           window.open(blobUrl, '_blank');
         }
+      } else if (['xls', 'xlsx', 'csv'].includes(ext)) {
+        const wb = XLSX.read(uInt8Array, { type: 'array' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        setSelectedExcel({ name: fullCatalog.name, data });
       } else {
-        // Display images in our clean premium modal overlay
         setSelectedView({ url: blobUrl, name: fullCatalog.name, type: contentType });
       }
     } catch (err) {
       console.error(err);
-      alert('Failed to load catalogue file.');
+      alert('Failed to load file.');
     } finally {
       setViewLoading(null);
     }
   };
-
   const handleDownload = async (catalogueId) => {
     try {
       setViewLoading(catalogueId);
@@ -211,11 +202,15 @@ const Catalogues = () => {
     const matchesSearch = cat.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           cat.fileName.toLowerCase().includes(searchQuery.toLowerCase());
     
+    const ext = cat.fileName.toLowerCase().split('.').pop();
     if (typeFilter === 'pdf') {
-      return matchesSearch && cat.fileType.includes('pdf');
+      return matchesSearch && ext === 'pdf';
     }
     if (typeFilter === 'image') {
-      return matchesSearch && !cat.fileType.includes('pdf');
+      return matchesSearch && ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext);
+    }
+    if (typeFilter === 'excel') {
+      return matchesSearch && ['xls', 'xlsx', 'csv'].includes(ext);
     }
     return matchesSearch;
   });
@@ -255,14 +250,14 @@ const Catalogues = () => {
               </div>
 
               <div className="form-group">
-                <label>Choose PDF or Image File (Max 10MB)</label>
+                <label>Choose PDF, Image or Excel File</label>
                 <div style={{ position: 'relative' }}>
                   <input
                     id="catalogue-file-input"
                     type="file"
                     className="form-input"
                     onChange={handleFileChange}
-                    accept=".pdf, image/*"
+                    accept=".pdf, .xls, .xlsx, .csv, image/*"
                     required
                     style={{ padding: '0.65rem' }}
                   />
@@ -341,6 +336,13 @@ const Catalogues = () => {
               >
                 Images
               </button>
+              <button
+                className={`btn ${typeFilter === 'excel' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ fontSize: '0.8rem', padding: '0.45rem 1rem' }}
+                onClick={() => setTypeFilter('excel')}
+              >
+                Excel
+              </button>
             </div>
           </div>
 
@@ -361,7 +363,29 @@ const Catalogues = () => {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
               {filteredCatalogues.map((cat) => {
-                const isPdf = cat.fileType.includes('pdf');
+                const ext = cat.fileName.toLowerCase().split('.').pop();
+                const isPdf = ext === 'pdf';
+                const isExcel = ['xls', 'xlsx', 'csv'].includes(ext);
+                
+                let iconColor = '#3b82f6';
+                let iconBg = '#eff6ff';
+                let iconElement = <FileImage size={22} />;
+                let typeText = 'Image File';
+                let borderCol = '#3b82f6';
+
+                if (isPdf) {
+                  iconColor = '#ef4444';
+                  iconBg = '#fef2f2';
+                  iconElement = <FileText size={22} />;
+                  typeText = 'PDF Document';
+                  borderCol = '#ef4444';
+                } else if (isExcel) {
+                  iconColor = '#10b981';
+                  iconBg = '#ecfdf5';
+                  iconElement = <FileSpreadsheet size={22} />;
+                  typeText = 'Excel Spreadsheet';
+                  borderCol = '#10b981';
+                }
                 
                 return (
                   <div 
@@ -373,7 +397,7 @@ const Catalogues = () => {
                       flexDirection: 'column', 
                       justifyContent: 'space-between',
                       transition: 'all 0.2s',
-                      borderLeft: `4px solid ${isPdf ? '#ef4444' : '#3b82f6'}`
+                      borderLeft: `4px solid ${borderCol}`
                     }}
                   >
                     <div>
@@ -385,10 +409,10 @@ const Catalogues = () => {
                           display: 'flex', 
                           alignItems: 'center', 
                           justifyContent: 'center',
-                          background: isPdf ? '#fef2f2' : '#eff6ff',
-                          color: isPdf ? '#ef4444' : '#3b82f6'
+                          background: iconBg,
+                          color: iconColor
                         }}>
-                          {isPdf ? <FileText size={22} /> : <Image size={22} />}
+                          {iconElement}
                         </div>
                         <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                           <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }} title={cat.name}>
@@ -403,7 +427,7 @@ const Catalogues = () => {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.8rem', background: '#f8fafc', padding: '0.75rem', borderRadius: '6px', marginBottom: '1.25rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: 'var(--text-secondary)' }}>File Type:</span>
-                          <span style={{ fontWeight: 600 }}>{isPdf ? 'PDF Document' : 'Image File'}</span>
+                          <span style={{ fontWeight: 600 }}>{typeText}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: 'var(--text-secondary)' }}>Uploaded:</span>
@@ -473,6 +497,54 @@ const Catalogues = () => {
                 alt={selectedView.name} 
                 style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '4px' }} 
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Excel Preview Modal Overlay */}
+      {selectedExcel && (
+        <div className="modal-overlay" onClick={() => setSelectedExcel(null)}>
+          <div className="modal-content" style={{ maxWidth: '90%', width: '1200px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <h3>{selectedExcel.name}</h3>
+              </div>
+              <button className="modal-close-btn" onClick={() => setSelectedExcel(null)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ overflow: 'auto', maxHeight: '70vh', padding: '1rem', background: '#f8fafc' }}>
+              <div style={{ background: 'white', borderRadius: '6px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr style={{ background: '#e2e8f0', borderBottom: '2px solid #cbd5e1' }}>
+                      {selectedExcel.data[0] && selectedExcel.data[0].map((col, idx) => (
+                        <th key={idx} style={{ padding: '0.75rem 1rem', borderRight: '1px solid #cbd5e1', textAlign: 'left', fontWeight: 600, color: '#334155' }}>
+                          {col !== undefined && col !== null ? String(col) : `Column ${idx + 1}`}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedExcel.data.slice(1).map((row, rowIdx) => {
+                      const maxCols = selectedExcel.data[0] ? selectedExcel.data[0].length : 0;
+                      return (
+                        <tr key={rowIdx} style={{ borderBottom: '1px solid #e2e8f0', background: rowIdx % 2 === 0 ? 'white' : '#f8fafc' }}>
+                          {Array.from({ length: maxCols }).map((_, cellIdx) => {
+                            const cell = row[cellIdx];
+                            return (
+                              <td key={cellIdx} style={{ padding: '0.75rem 1rem', borderRight: '1px solid #e2e8f0', color: '#475569' }}>
+                                {cell !== undefined && cell !== null ? String(cell) : ''}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>

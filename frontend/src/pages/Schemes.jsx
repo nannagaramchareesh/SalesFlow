@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getSchemes, getSchemeById, createScheme, deleteScheme } from '../utils/api';
-import { FileText, Trash2, Search, FileUp, Eye, Download, RefreshCw } from 'lucide-react';
+import { FileText, Trash2, Search, FileUp, Eye, Download, RefreshCw, FileSpreadsheet, FileImage, Image, X } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 const Schemes = () => {
   const [schemes, setSchemes] = useState([]);
@@ -13,8 +14,13 @@ const Schemes = () => {
   const [file, setFile] = useState(null);
   const [fileError, setFileError] = useState('');
   
-  // Search State
+  // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all'); // all, pdf, excel, image
+
+  // Preview Modal State
+  const [selectedExcel, setSelectedExcel] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
   
   useEffect(() => {
     fetchData();
@@ -40,18 +46,13 @@ const Schemes = () => {
       return;
     }
     
-    // Check file size (limit to 10MB)
-    if (selected.size > 10 * 1024 * 1024) {
-      setFileError('File size must be less than 10MB');
-      setFile(null);
-      e.target.value = null;
-      return;
-    }
+    // Validate file type (PDF only)
     
     // Validate file type (PDF only)
     const extension = selected.name.split('.').pop().toLowerCase();
-    if (extension !== 'pdf') {
-      setFileError('Only PDF files are supported for schemes');
+    const validExtensions = ['pdf', 'xls', 'xlsx', 'csv', 'jpg', 'jpeg', 'png', 'webp', 'gif'];
+    if (!validExtensions.includes(extension)) {
+      setFileError('Unsupported file type. Please upload a PDF, Excel spreadsheet, or Image.');
       setFile(null);
       e.target.value = null;
       return;
@@ -176,17 +177,29 @@ const Schemes = () => {
         uInt8Array[i] = raw.charCodeAt(i);
       }
       
-      const blob = new Blob([uInt8Array], { type: contentType });
-      const blobUrl = URL.createObjectURL(blob);
-      
-      const win = window.open();
-      if (win) {
-        win.document.write(
-          `<iframe src="${blobUrl}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`
-        );
-        win.document.title = fullScheme.name;
+      const ext = fullScheme.fileName.toLowerCase().split('.').pop();
+      if (ext === 'pdf') {
+        const blob = new Blob([uInt8Array], { type: contentType });
+        const blobUrl = URL.createObjectURL(blob);
+        const win = window.open();
+        if (win) {
+          win.document.write(
+            `<iframe src="${blobUrl}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`
+          );
+          win.document.title = fullScheme.name;
+        } else {
+          window.open(blobUrl, '_blank');
+        }
+      } else if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext) || contentType.startsWith('image/')) {
+        const blob = new Blob([uInt8Array], { type: contentType });
+        const blobUrl = URL.createObjectURL(blob);
+        setSelectedImage({ name: fullScheme.name, url: blobUrl });
       } else {
-        window.open(blobUrl, '_blank');
+        const wb = XLSX.read(uInt8Array, { type: 'array' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        setSelectedExcel({ name: fullScheme.name, data });
       }
     } catch (err) {
       console.error(err);
@@ -196,10 +209,22 @@ const Schemes = () => {
     }
   };
 
-  const filteredSchemes = schemes.filter(s => 
-    s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    s.fileName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredSchemes = schemes.filter(s => {
+    const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          s.fileName.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const ext = s.fileName.toLowerCase().split('.').pop();
+    if (typeFilter === 'pdf') {
+      return matchesSearch && ext === 'pdf';
+    }
+    if (typeFilter === 'excel') {
+      return matchesSearch && ['xls', 'xlsx', 'csv'].includes(ext);
+    }
+    if (typeFilter === 'image') {
+      return matchesSearch && ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext);
+    }
+    return matchesSearch;
+  });
 
   return (
     <div className="page-container" style={{ maxWidth: '100%' }}>
@@ -218,7 +243,7 @@ const Schemes = () => {
         <div className="card" style={{ background: 'white' }}>
           <h2 style={{ fontSize: '1.2rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <FileUp size={20} className="text-primary" />
-            Upload New Scheme PDF
+            Upload New Scheme Document
           </h2>
           
           <form onSubmit={handleUploadSubmit}>
@@ -236,14 +261,14 @@ const Schemes = () => {
               </div>
 
               <div className="form-group">
-                <label>Choose PDF File (Max 10MB)</label>
+                <label>Choose File (PDF, Excel, Image)</label>
                 <div style={{ position: 'relative' }}>
                   <input
                     id="scheme-file-input"
                     type="file"
                     className="form-input"
                     onChange={handleFileChange}
-                    accept=".pdf"
+                    accept=".pdf, .xls, .xlsx, .csv, image/*"
                     required
                     style={{ padding: '0.65rem' }}
                   />
@@ -299,6 +324,37 @@ const Schemes = () => {
                 placeholder="Search schemes by name..."
               />
             </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                className={`btn ${typeFilter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ fontSize: '0.8rem', padding: '0.45rem 1rem' }}
+                onClick={() => setTypeFilter('all')}
+              >
+                All
+              </button>
+              <button
+                className={`btn ${typeFilter === 'pdf' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ fontSize: '0.8rem', padding: '0.45rem 1rem' }}
+                onClick={() => setTypeFilter('pdf')}
+              >
+                PDFs
+              </button>
+              <button
+                className={`btn ${typeFilter === 'excel' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ fontSize: '0.8rem', padding: '0.45rem 1rem' }}
+                onClick={() => setTypeFilter('excel')}
+              >
+                Excel
+              </button>
+              <button
+                className={`btn ${typeFilter === 'image' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ fontSize: '0.8rem', padding: '0.45rem 1rem' }}
+                onClick={() => setTypeFilter('image')}
+              >
+                Images
+              </button>
+            </div>
           </div>
 
           {/* Schemes Listing */}
@@ -318,6 +374,30 @@ const Schemes = () => {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
               {filteredSchemes.map((scheme) => {
+                const ext = scheme.fileName.toLowerCase().split('.').pop();
+                const isPdf = ext === 'pdf';
+                const isExcel = ['xls', 'xlsx', 'csv'].includes(ext);
+
+                let iconColor = '#2563eb';
+                let iconBg = '#eff6ff';
+                let iconElement = <FileText size={22} />;
+                let typeText = 'PDF Document';
+                let borderCol = '#2563eb';
+
+                if (isExcel) {
+                  iconColor = '#10b981';
+                  iconBg = '#ecfdf5';
+                  iconElement = <FileSpreadsheet size={22} />;
+                  typeText = 'Excel Spreadsheet';
+                  borderCol = '#10b981';
+                } else if (!isPdf) {
+                  iconColor = '#8b5cf6';
+                  iconBg = '#faf5ff';
+                  iconElement = <FileImage size={22} />;
+                  typeText = 'Image File';
+                  borderCol = '#8b5cf6';
+                }
+
                 return (
                   <div 
                     key={scheme._id} 
@@ -328,7 +408,7 @@ const Schemes = () => {
                       flexDirection: 'column', 
                       justifyContent: 'space-between',
                       transition: 'all 0.2s',
-                      borderLeft: '4px solid #2563eb' // Professional Blue color representing active Schemes
+                      borderLeft: `4px solid ${borderCol}`
                     }}
                   >
                     <div>
@@ -340,10 +420,10 @@ const Schemes = () => {
                           display: 'flex', 
                           alignItems: 'center', 
                           justifyContent: 'center',
-                          background: '#eff6ff',
-                          color: '#2563eb'
+                          background: iconBg,
+                          color: iconColor
                         }}>
-                          <FileText size={22} />
+                          {iconElement}
                         </div>
                         <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                           <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }} title={scheme.name}>
@@ -358,7 +438,7 @@ const Schemes = () => {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.8rem', background: '#f8fafc', padding: '0.75rem', borderRadius: '6px', marginBottom: '1.25rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: 'var(--text-secondary)' }}>File Type:</span>
-                          <span style={{ fontWeight: 600 }}>PDF Document</span>
+                          <span style={{ fontWeight: 600 }}>{typeText}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: 'var(--text-secondary)' }}>Uploaded:</span>
@@ -409,6 +489,77 @@ const Schemes = () => {
           )}
         </div>
       </div>
+
+      {/* Image Preview Modal Overlay */}
+      {selectedImage && (
+        <div className="modal-overlay" onClick={() => setSelectedImage(null)}>
+          <div className="modal-content" style={{ maxWidth: '800px', width: '90%' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <h3>{selectedImage.name}</h3>
+              </div>
+              <button className="modal-close-btn" onClick={() => setSelectedImage(null)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ textAlign: 'center', background: '#0f172a', padding: '1rem', display: 'flex', justifyContent: 'center', alignItems: 'center', maxHeight: '70vh' }}>
+              <img 
+                src={selectedImage.url} 
+                alt={selectedImage.name} 
+                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '4px' }} 
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Excel Preview Modal Overlay */}
+      {selectedExcel && (
+        <div className="modal-overlay" onClick={() => setSelectedExcel(null)}>
+          <div className="modal-content" style={{ maxWidth: '90%', width: '1200px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <h3>{selectedExcel.name}</h3>
+              </div>
+              <button className="modal-close-btn" onClick={() => setSelectedExcel(null)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ overflow: 'auto', maxHeight: '70vh', padding: '1rem', background: '#f8fafc' }}>
+              <div style={{ background: 'white', borderRadius: '6px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr style={{ background: '#e2e8f0', borderBottom: '2px solid #cbd5e1' }}>
+                      {selectedExcel.data[0] && selectedExcel.data[0].map((col, idx) => (
+                        <th key={idx} style={{ padding: '0.75rem 1rem', borderRight: '1px solid #cbd5e1', textAlign: 'left', fontWeight: 600, color: '#334155' }}>
+                          {col !== undefined && col !== null ? String(col) : `Column ${idx + 1}`}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedExcel.data.slice(1).map((row, rowIdx) => {
+                      const maxCols = selectedExcel.data[0] ? selectedExcel.data[0].length : 0;
+                      return (
+                        <tr key={rowIdx} style={{ borderBottom: '1px solid #e2e8f0', background: rowIdx % 2 === 0 ? 'white' : '#f8fafc' }}>
+                          {Array.from({ length: maxCols }).map((_, cellIdx) => {
+                            const cell = row[cellIdx];
+                            return (
+                              <td key={cellIdx} style={{ padding: '0.75rem 1rem', borderRight: '1px solid #e2e8f0', color: '#475569' }}>
+                                {cell !== undefined && cell !== null ? String(cell) : ''}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes spin {
