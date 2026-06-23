@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { getPriceLists, getPriceListById, createPriceList, deletePriceList } from '../utils/api';
 import { FileSpreadsheet, FileText, Trash2, Search, FileUp, Eye, Download, RefreshCw, X, File } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 const PriceLists = () => {
   const [priceLists, setPriceLists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [viewLoading, setViewLoading] = useState(null);
+  const [selectedExcel, setSelectedExcel] = useState(null);
   
   // Form State
   const [name, setName] = useState('');
@@ -178,10 +180,9 @@ const PriceLists = () => {
         uInt8Array[i] = raw.charCodeAt(i);
       }
       
-      const blob = new Blob([uInt8Array], { type: contentType });
-      const blobUrl = URL.createObjectURL(blob);
-      
-      if (contentType.includes('pdf')) {
+      if (contentType.includes('pdf') || fullPriceList.fileName.toLowerCase().endsWith('.pdf')) {
+        const blob = new Blob([uInt8Array], { type: contentType });
+        const blobUrl = URL.createObjectURL(blob);
         const win = window.open();
         if (win) {
           win.document.write(
@@ -191,6 +192,13 @@ const PriceLists = () => {
         } else {
           window.open(blobUrl, '_blank');
         }
+      } else {
+        // Parse Excel/CSV
+        const wb = XLSX.read(uInt8Array, { type: 'array' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        setSelectedExcel({ name: fullPriceList.name, data });
       }
     } catch (err) {
       console.error(err);
@@ -411,21 +419,19 @@ const PriceLists = () => {
                     </div>
 
                     <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
-                      {isPdfFile && (
-                        <button
-                          className="btn btn-secondary"
-                          onClick={() => handleView(pl._id)}
-                          disabled={viewLoading === pl._id}
-                          style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', padding: '0.45rem 0.75rem', fontSize: '0.85rem' }}
-                        >
-                          {viewLoading === pl._id ? (
-                            <RefreshCw size={14} className="spinner" style={{ animation: 'spin 1s linear infinite' }} />
-                          ) : (
-                            <Eye size={14} />
-                          )}
-                          View
-                        </button>
-                      )}
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => handleView(pl._id)}
+                        disabled={viewLoading === pl._id}
+                        style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', padding: '0.45rem 0.75rem', fontSize: '0.85rem' }}
+                      >
+                        {viewLoading === pl._id ? (
+                          <RefreshCw size={14} className="spinner" style={{ animation: 'spin 1s linear infinite' }} />
+                        ) : (
+                          <Eye size={14} />
+                        )}
+                        View
+                      </button>
                       <button
                         className="btn btn-secondary"
                         onClick={() => handleDownload(pl._id)}
@@ -454,6 +460,54 @@ const PriceLists = () => {
           )}
         </div>
       </div>
+
+      {/* Excel Preview Modal Overlay */}
+      {selectedExcel && (
+        <div className="modal-overlay" onClick={() => setSelectedExcel(null)}>
+          <div className="modal-content" style={{ maxWidth: '90%', width: '1200px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <h3>{selectedExcel.name}</h3>
+              </div>
+              <button className="modal-close-btn" onClick={() => setSelectedExcel(null)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ overflow: 'auto', maxHeight: '70vh', padding: '1rem', background: '#f8fafc' }}>
+              <div style={{ background: 'white', borderRadius: '6px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr style={{ background: '#e2e8f0', borderBottom: '2px solid #cbd5e1' }}>
+                      {selectedExcel.data[0] && selectedExcel.data[0].map((col, idx) => (
+                        <th key={idx} style={{ padding: '0.75rem 1rem', borderRight: '1px solid #cbd5e1', textAlign: 'left', fontWeight: 600, color: '#334155' }}>
+                          {col !== undefined && col !== null ? String(col) : `Column ${idx + 1}`}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedExcel.data.slice(1).map((row, rowIdx) => {
+                      const maxCols = selectedExcel.data[0] ? selectedExcel.data[0].length : 0;
+                      return (
+                        <tr key={rowIdx} style={{ borderBottom: '1px solid #e2e8f0', background: rowIdx % 2 === 0 ? 'white' : '#f8fafc' }}>
+                          {Array.from({ length: maxCols }).map((_, cellIdx) => {
+                            const cell = row[cellIdx];
+                            return (
+                              <td key={cellIdx} style={{ padding: '0.75rem 1rem', borderRight: '1px solid #e2e8f0', color: '#475569' }}>
+                                {cell !== undefined && cell !== null ? String(cell) : ''}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Styling for animations */}
       <style>{`

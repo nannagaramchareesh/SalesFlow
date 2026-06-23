@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getCatalogues, getCatalogueById, createCatalogue, deleteCatalogue } from '../utils/api';
-import { BookOpen, FileText, Image, Trash2, Search, FileUp, Eye, X, RefreshCw } from 'lucide-react';
+import { BookOpen, FileText, Image, Trash2, Search, FileUp, Eye, X, RefreshCw, Download } from 'lucide-react';
 
 const Catalogues = () => {
   const [catalogues, setCatalogues] = useState([]);
@@ -168,6 +168,40 @@ const Catalogues = () => {
     } catch (err) {
       console.error(err);
       alert('Failed to load catalogue file.');
+    } finally {
+      setViewLoading(null);
+    }
+  };
+
+  const handleDownload = async (catalogueId) => {
+    try {
+      setViewLoading(catalogueId);
+      const fullCatalog = await getCatalogueById(catalogueId);
+      
+      const base64Data = fullCatalog.fileData;
+      const parts = base64Data.split(';base64,');
+      const contentType = parts[0].split(':')[1];
+      const raw = window.atob(parts[1]);
+      const rawLength = raw.length;
+      const uInt8Array = new Uint8Array(rawLength);
+      
+      for (let i = 0; i < rawLength; ++i) {
+        uInt8Array[i] = raw.charCodeAt(i);
+      }
+      
+      const blob = new Blob([uInt8Array], { type: contentType });
+      const blobUrl = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = fullCatalog.fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to download catalogue.');
     } finally {
       setViewLoading(null);
     }
@@ -383,7 +417,7 @@ const Catalogues = () => {
                         className="btn btn-secondary"
                         onClick={() => handleView(cat._id)}
                         disabled={viewLoading === cat._id}
-                        style={{ flex: 1, display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.45rem 0.75rem', fontSize: '0.85rem' }}
+                        style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', padding: '0.45rem 0.75rem', fontSize: '0.85rem' }}
                       >
                         {viewLoading === cat._id ? (
                           <RefreshCw size={14} className="spinner" style={{ animation: 'spin 1s linear infinite' }} />
@@ -391,6 +425,19 @@ const Catalogues = () => {
                           <Eye size={14} />
                         )}
                         View
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => handleDownload(cat._id)}
+                        disabled={viewLoading === cat._id}
+                        style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', padding: '0.45rem 0.75rem', fontSize: '0.85rem' }}
+                      >
+                        {viewLoading === cat._id ? (
+                          <RefreshCw size={14} className="spinner" style={{ animation: 'spin 1s linear infinite' }} />
+                        ) : (
+                          <Download size={14} />
+                        )}
+                        Download
                       </button>
                       <button
                         className="btn btn-secondary"

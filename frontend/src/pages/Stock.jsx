@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { getStocks, getStockById, createStock, deleteStock } from '../utils/api';
-import { FileSpreadsheet, Trash2, Search, FileUp, Download, RefreshCw } from 'lucide-react';
+import { FileSpreadsheet, Trash2, Search, FileUp, Download, RefreshCw, Eye, X } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 const Stock = () => {
   const [stocks, setStocks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [downloadLoading, setDownloadLoading] = useState(null);
+  const [viewLoading, setViewLoading] = useState(null);
+  const [selectedExcel, setSelectedExcel] = useState(null);
   
   // Form State
   const [name, setName] = useState('');
@@ -158,6 +161,50 @@ const Stock = () => {
       alert('Failed to download stock sheet.');
     } finally {
       setDownloadLoading(null);
+    }
+  };
+
+  const handleView = async (stockId) => {
+    try {
+      setViewLoading(stockId);
+      const fullStock = await getStockById(stockId);
+      
+      const base64Data = fullStock.fileData;
+      const parts = base64Data.split(';base64,');
+      const contentType = parts[0].split(':')[1];
+      const raw = window.atob(parts[1]);
+      const rawLength = raw.length;
+      const uInt8Array = new Uint8Array(rawLength);
+      
+      for (let i = 0; i < rawLength; ++i) {
+        uInt8Array[i] = raw.charCodeAt(i);
+      }
+      
+      if (contentType.includes('pdf') || fullStock.fileName.toLowerCase().endsWith('.pdf')) {
+        const blob = new Blob([uInt8Array], { type: contentType });
+        const blobUrl = URL.createObjectURL(blob);
+        const win = window.open();
+        if (win) {
+          win.document.write(
+            `<iframe src="${blobUrl}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`
+          );
+          win.document.title = fullStock.name;
+        } else {
+          window.open(blobUrl, '_blank');
+        }
+      } else {
+        // Parse Excel/CSV
+        const wb = XLSX.read(uInt8Array, { type: 'array' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        setSelectedExcel({ name: fullStock.name, data });
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to view stock sheet.');
+    } finally {
+      setViewLoading(null);
     }
   };
 
@@ -335,23 +382,36 @@ const Stock = () => {
                     <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
                       <button
                         className="btn btn-secondary"
+                        onClick={() => handleView(stock._id)}
+                        disabled={viewLoading === stock._id}
+                        style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', padding: '0.45rem 0.75rem', fontSize: '0.85rem' }}
+                      >
+                        {viewLoading === stock._id ? (
+                          <RefreshCw size={14} className="spinner" style={{ animation: 'spin 1s linear infinite' }} />
+                        ) : (
+                          <Eye size={14} />
+                        )}
+                        View
+                      </button>
+                      <button
+                        className="btn btn-secondary"
                         onClick={() => handleDownload(stock._id)}
-                        disabled={downloadLoading === stock._id}
-                        style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', padding: '0.6rem 0.75rem', fontSize: '0.85rem' }}
+                        disabled={downloadLoading === stock._id || viewLoading === stock._id}
+                        style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', padding: '0.45rem 0.75rem', fontSize: '0.85rem' }}
                       >
                         {downloadLoading === stock._id ? (
                           <RefreshCw size={14} className="spinner" style={{ animation: 'spin 1s linear infinite' }} />
                         ) : (
                           <Download size={14} />
                         )}
-                        Download Stock File
+                        Download
                       </button>
                       <button
                         className="btn btn-secondary"
                         onClick={() => handleDelete(stock._id, stock.name)}
-                        style={{ color: 'var(--danger-color)', borderColor: '#fee2e2', hoverBackground: '#fef2f2', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0.45rem', width: '42px' }}
+                        style={{ color: 'var(--danger-color)', borderColor: '#fee2e2', hoverBackground: '#fef2f2', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0.45rem', width: '36px' }}
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   </div>
@@ -361,6 +421,54 @@ const Stock = () => {
           )}
         </div>
       </div>
+
+      {/* Excel Preview Modal Overlay */}
+      {selectedExcel && (
+        <div className="modal-overlay" onClick={() => setSelectedExcel(null)}>
+          <div className="modal-content" style={{ maxWidth: '90%', width: '1200px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <h3>{selectedExcel.name}</h3>
+              </div>
+              <button className="modal-close-btn" onClick={() => setSelectedExcel(null)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ overflow: 'auto', maxHeight: '70vh', padding: '1rem', background: '#f8fafc' }}>
+              <div style={{ background: 'white', borderRadius: '6px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr style={{ background: '#e2e8f0', borderBottom: '2px solid #cbd5e1' }}>
+                      {selectedExcel.data[0] && selectedExcel.data[0].map((col, idx) => (
+                        <th key={idx} style={{ padding: '0.75rem 1rem', borderRight: '1px solid #cbd5e1', textAlign: 'left', fontWeight: 600, color: '#334155' }}>
+                          {col !== undefined && col !== null ? String(col) : `Column ${idx + 1}`}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedExcel.data.slice(1).map((row, rowIdx) => {
+                      const maxCols = selectedExcel.data[0] ? selectedExcel.data[0].length : 0;
+                      return (
+                        <tr key={rowIdx} style={{ borderBottom: '1px solid #e2e8f0', background: rowIdx % 2 === 0 ? 'white' : '#f8fafc' }}>
+                          {Array.from({ length: maxCols }).map((_, cellIdx) => {
+                            const cell = row[cellIdx];
+                            return (
+                              <td key={cellIdx} style={{ padding: '0.75rem 1rem', borderRight: '1px solid #e2e8f0', color: '#475569' }}>
+                                {cell !== undefined && cell !== null ? String(cell) : ''}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes spin {

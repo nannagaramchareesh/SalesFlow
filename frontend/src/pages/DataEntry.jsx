@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { getInvoices, createInvoice, updateInvoice, deleteInvoice, createBulkInvoices, getDealers } from '../utils/api';
 import { calculateOverdueDays, calculateTotalReceived, calculateDealerTotalOutstanding, countOverdueBills } from '../utils/formulas';
 import { DEALERS_LIST, getDealerDetails } from '../utils/dealers';
+import { useToast } from '../context/ToastContext';
 
 const getMonthAbbreviation = (dateStr) => {
   if (!dateStr) return '';
@@ -13,6 +14,7 @@ const getMonthAbbreviation = (dateStr) => {
 };
 
 const DataEntry = () => {
+  const toast = useToast();
   const [invoices, setInvoices] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [selectedDealer, setSelectedDealer] = useState('');
@@ -69,25 +71,32 @@ const DataEntry = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.invoiceNumber || !formData.dealerName || !formData.invoiceValue || !formData.invoiceValueBeforeTax) return;
 
     const { isCustomDealer, ...rest } = formData;
     const payload = {
       ...rest,
-      invoiceValueBeforeTax: Number(formData.invoiceValueBeforeTax),
-      invoiceValue: Number(formData.invoiceValue),
-      dateOfInvoice: new Date(formData.dateOfInvoice).toISOString()
+      invoiceNumber: formData.invoiceNumber.trim() || undefined,
+      dealerName: formData.dealerName.trim() || undefined,
+      invoiceValueBeforeTax: formData.invoiceValueBeforeTax !== '' ? Number(formData.invoiceValueBeforeTax) : 0,
+      invoiceValue: formData.invoiceValue !== '' ? Number(formData.invoiceValue) : 0,
+      dateOfInvoice: formData.dateOfInvoice ? new Date(formData.dateOfInvoice).toISOString() : undefined
     };
 
-    if (editingId) {
-      await updateInvoice(editingId, payload);
-      setEditingId(null);
-    } else {
-      await createInvoice(payload);
+    try {
+      if (editingId) {
+        await updateInvoice(editingId, payload);
+        toast.success('Invoice updated successfully!');
+        setEditingId(null);
+      } else {
+        await createInvoice(payload);
+        toast.success('Invoice created successfully!');
+      }
+      setFormData(initialFormState);
+      loadInvoices();
+    } catch (err) {
+      console.error('Error saving invoice:', err);
+      toast.error(err.response?.data?.message || 'Failed to save invoice.');
     }
-
-    setFormData(initialFormState);
-    loadInvoices();
   };
 
   const handleEdit = (inv) => {
@@ -111,8 +120,14 @@ const DataEntry = () => {
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this invoice?')) {
-      await deleteInvoice(id);
-      loadInvoices();
+      try {
+        await deleteInvoice(id);
+        toast.success('Invoice deleted successfully!');
+        loadInvoices();
+      } catch (err) {
+        console.error('Error deleting invoice:', err);
+        toast.error('Failed to delete invoice.');
+      }
     }
   };
 
@@ -212,7 +227,7 @@ const DataEntry = () => {
             salesTeam,
             status: 'Unpaid'
           };
-        }).filter(inv => inv.invoiceNumber && inv.dealerName);
+        }).filter(inv => inv.invoiceNumber || inv.dealerName);
 
         if (parsedInvoices.length === 0) {
           setExcelError('No valid rows found. Please check columns: invoice number, dealer name, invoice date, invoice value, invoice value before tax.');
@@ -236,22 +251,28 @@ const DataEntry = () => {
       const response = await createBulkInvoices(excelPreview);
       
       if (response && response.message && response.message.includes('failed to insert')) {
+        const msg = `${response.insertedCount} invoices imported successfully. Some duplicate invoice numbers were skipped.`;
         setImportResult({
           success: true,
-          message: `${response.insertedCount} invoices imported successfully. Some duplicate invoice numbers were skipped.`,
+          message: msg,
           count: response.insertedCount
         });
+        toast.warning(msg);
       } else {
+        const msg = `Successfully imported ${excelPreview.length} invoices!`;
         setImportResult({
           success: true,
-          message: `Successfully imported ${excelPreview.length} invoices!`,
+          message: msg,
           count: excelPreview.length
         });
+        toast.success(msg);
       }
       setExcelPreview([]);
       loadInvoices();
     } catch (err) {
-      setExcelError('Error saving invoices: ' + (err.response?.data?.message || err.message));
+      const errMsg = 'Error saving invoices: ' + (err.response?.data?.message || err.message);
+      setExcelError(errMsg);
+      toast.error(errMsg);
     } finally {
       setIsImporting(false);
     }
@@ -474,7 +495,6 @@ const DataEntry = () => {
                   setFormData({ ...formData, invoiceNumber: val, brand: brand });
                 }}
                 placeholder="e.g. PE-EH24001682"
-                required
               />
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
@@ -502,7 +522,6 @@ const DataEntry = () => {
                       )?.displayName || '')
                 }
                 onChange={handleDealerChange}
-                required
               >
                 <option value="">-- Select Dealer --</option>
                 {dealersList.map(d => (
@@ -521,7 +540,6 @@ const DataEntry = () => {
                   value={formData.dealerName}
                   onChange={e => setFormData({ ...formData, dealerName: e.target.value })}
                   placeholder="Enter dealer name"
-                  required
                 />
               </div>
             )}
@@ -565,7 +583,6 @@ const DataEntry = () => {
                     month: getMonthAbbreviation(val)
                   }));
                 }}
-                required
               />
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
@@ -581,11 +598,11 @@ const DataEntry = () => {
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.25rem', display: 'block' }}>Invoice Value Before Tax (₹)</label>
-              <input type="number" className="form-input" value={formData.invoiceValueBeforeTax} onChange={e => setFormData({ ...formData, invoiceValueBeforeTax: e.target.value })} placeholder="0.00" required />
+              <input type="number" className="form-input" value={formData.invoiceValueBeforeTax} onChange={e => setFormData({ ...formData, invoiceValueBeforeTax: e.target.value })} placeholder="0.00" />
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.25rem', display: 'block' }}>Invoice Value (₹)</label>
-              <input type="number" className="form-input" value={formData.invoiceValue} onChange={e => setFormData({ ...formData, invoiceValue: e.target.value })} placeholder="0.00" required />
+              <input type="number" className="form-input" value={formData.invoiceValue} onChange={e => setFormData({ ...formData, invoiceValue: e.target.value })} placeholder="0.00" />
             </div>
 
             <div className="mobile-actions-stack" style={{ display: 'flex', gap: '0.5rem', height: '42px' }}>

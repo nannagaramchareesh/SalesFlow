@@ -2,18 +2,18 @@ const mongoose = require('mongoose');
 
 const invoiceSchema = mongoose.Schema(
   {
-    invoiceNumber: { type: String, required: true, unique: true },
-    dealerName: { type: String, required: true },
-    dateOfInvoice: { type: Date, required: true, default: Date.now },
+    invoiceNumber: { type: String, required: false, unique: true, sparse: true },
+    dealerName: { type: String, required: false },
+    dateOfInvoice: { type: Date, required: false, default: Date.now },
     invoiceValueBeforeTax: { type: Number, required: false },
-    invoiceValue: { type: Number, required: true },
-    balance: { type: Number, required: true },
+    invoiceValue: { type: Number, required: false, default: 0 },
+    balance: { type: Number, required: false, default: 0 },
     brand: { type: String, required: false },
     month: { type: String, required: false },
     belt: { type: String, required: false },
     salesTeam: { type: String, required: false },
     invoiceImage: { type: String },
-    status: { type: String, required: true, default: 'Unpaid' }, // Unpaid, Partial, Paid
+    status: { type: String, required: false, default: 'Unpaid' }, // Unpaid, Partial, Paid
     chequeReturnAmount: { type: Number, default: 0 },
     chequeReturnDate: { type: Date },
     srCrValue: { type: Number, default: 0 },
@@ -62,8 +62,11 @@ invoiceSchema.pre('validate', function() {
   const customReturn = Math.max(0, (this.chequeReturnAmount || 0) - bouncedReceived);
 
   // Calculate Outstanding Balance (add back the customReturn charges/fees, subtract non-bounced payments and credits)
-  let calculatedBalance = this.invoiceValue - totalReceived - (this.srCrValue || 0) + customReturn;
-  if (calculatedBalance < 0) calculatedBalance = 0;
+  const invoiceValue = this.invoiceValue || 0;
+  let calculatedBalance = invoiceValue - totalReceived - (this.srCrValue || 0) + customReturn;
+  if (isNaN(calculatedBalance) || calculatedBalance < 0) {
+    calculatedBalance = 0;
+  }
   
   this.balance = calculatedBalance;
 

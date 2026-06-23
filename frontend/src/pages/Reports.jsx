@@ -871,16 +871,13 @@ const Reports = () => {
                   <table className="responsive-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                     <thead>
                       <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left' }}>
-                        <th style={{ position: 'sticky', left: 0, background: '#f8fafc', zIndex: 10, padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, borderRight: '2px solid #e2e8f0', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.1)' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <input 
-                              type="checkbox" 
-                              checked={allDealerInvoicesSelected} 
-                              onChange={handleSelectAllToggle}
-                              style={{ cursor: 'pointer', width: '16px', height: '16px' }} 
-                            />
-                            <span>Dealer Name</span>
-                          </div>
+                        <th style={{ position: 'sticky', left: 0, background: '#f8fafc', zIndex: 10, padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, borderRight: '2px solid #e2e8f0', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.1)', width: '50px' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={allDealerInvoicesSelected} 
+                            onChange={handleSelectAllToggle}
+                            style={{ cursor: 'pointer', width: '16px', height: '16px' }} 
+                          />
                         </th>
                         <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Invoice Number</th>
                         <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>Invoice Value</th>
@@ -888,14 +885,12 @@ const Reports = () => {
                         <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>Balance</th>
                         <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Brand</th>
                         <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Date of Invoice</th>
-                        <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Sales Team</th>
-                        <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Belt</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredInvoices.length === 0 ? (
                         <tr>
-                          <td colSpan="9" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                          <td colSpan="7" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
                             No bills found.
                           </td>
                         </tr>
@@ -908,16 +903,13 @@ const Reports = () => {
 
                             return (
                               <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                <td style={{ position: 'sticky', left: 0, background: 'white', zIndex: 10, padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--primary-color)', borderRight: '2px solid #e2e8f0', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.1)' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                    <input 
-                                      type="checkbox" 
-                                      checked={!!selectedInvoices[inv._id]} 
-                                      onChange={() => toggleInvoiceSelection(inv._id)}
-                                      style={{ cursor: 'pointer', width: '16px', height: '16px' }} 
-                                    />
-                                    <span>{inv.dealerName}</span>
-                                  </div>
+                                <td style={{ position: 'sticky', left: 0, background: 'white', zIndex: 10, padding: '0.75rem 1rem', borderRight: '2px solid #e2e8f0', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.1)' }}>
+                                  <input 
+                                    type="checkbox" 
+                                    checked={!!selectedInvoices[inv._id]} 
+                                    onChange={() => toggleInvoiceSelection(inv._id)}
+                                    style={{ cursor: 'pointer', width: '16px', height: '16px' }} 
+                                  />
                                 </td>
                                 <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{inv.invoiceNumber}</td>
                                 <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>₹{value.toLocaleString()}</td>
@@ -927,8 +919,6 @@ const Reports = () => {
                                 <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: balance > 0 ? '#b91c1c' : '#15803d' }}>₹{balance.toLocaleString()}</td>
                                 <td style={{ padding: '0.75rem 1rem' }}>{inv.brand || '-'}</td>
                                 <td style={{ padding: '0.75rem 1rem' }}>{new Date(inv.dateOfInvoice || inv.date).toLocaleDateString()}</td>
-                                <td style={{ padding: '0.75rem 1rem' }}>{inv.salesTeam || '-'}</td>
-                                <td style={{ padding: '0.75rem 1rem' }}>{inv.belt || '-'}</td>
                               </tr>
                             );
                           })}
@@ -940,7 +930,7 @@ const Reports = () => {
                             <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>₹{sumInvoicedValue.toLocaleString()}</td>
                             <td></td>
                             <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: '#b91c1c' }}>₹{sumOutstandingBalance.toLocaleString()}</td>
-                            <td colSpan="4"></td>
+                            <td colSpan="2"></td>
                           </tr>
                         </>
                       )}
@@ -988,11 +978,7 @@ const Reports = () => {
                               </span>
                             </div>
                             
-                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-                              Dealer: <strong>{inv.dealerName}</strong>
-                            </div>
-
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem', background: '#f8fafc', padding: '0.5rem', borderRadius: '6px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem', background: '#f8fafc', padding: '0.5rem', borderRadius: '6px', marginTop: '0.5rem' }}>
                               <div>
                                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>VALUE</span>
                                 <div style={{ fontWeight: 600 }}>₹{value.toLocaleString()}</div>
@@ -1009,13 +995,9 @@ const Reports = () => {
                                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>DATE</span>
                                 <div style={{ fontWeight: 600 }}>{new Date(inv.dateOfInvoice || inv.date).toLocaleDateString()}</div>
                               </div>
-                              <div>
+                              <div style={{ gridColumn: 'span 2' }}>
                                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>BRAND</span>
                                 <div style={{ fontWeight: 600 }}>{inv.brand || '-'}</div>
-                              </div>
-                              <div>
-                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>TEAM / BELT</span>
-                                <div style={{ fontWeight: 600 }}>{inv.salesTeam || '-'} / {inv.belt || '-'}</div>
                               </div>
                             </div>
                           </div>
@@ -1053,21 +1035,18 @@ const Reports = () => {
                 <table className="print-table">
                   <thead>
                     <tr>
-                      <th style={{ width: '22%', textAlign: 'left' }}>Dealer Name</th>
-                      <th style={{ width: '13%', textAlign: 'left' }}>Invoice Number</th>
-                      <th style={{ width: '10%', textAlign: 'right' }}>Invoice Value</th>
-                      <th style={{ width: '8%', textAlign: 'center' }}>Overdue Days</th>
-                      <th style={{ width: '11%', textAlign: 'right' }}>Balance</th>
-                      <th style={{ width: '9%', textAlign: 'left' }}>Brand</th>
-                      <th style={{ width: '11%', textAlign: 'left' }}>Date</th>
-                      <th style={{ width: '9%', textAlign: 'left' }}>Sales Team</th>
-                      <th style={{ width: '7%', textAlign: 'left' }}>Belt</th>
+                      <th style={{ width: '25%', textAlign: 'left' }}>Invoice Number</th>
+                      <th style={{ width: '15%', textAlign: 'right' }}>Invoice Value</th>
+                      <th style={{ width: '12%', textAlign: 'center' }}>Overdue Days</th>
+                      <th style={{ width: '18%', textAlign: 'right' }}>Balance</th>
+                      <th style={{ width: '15%', textAlign: 'left' }}>Brand</th>
+                      <th style={{ width: '15%', textAlign: 'left' }}>Date</th>
                     </tr>
                   </thead>
                   <tbody>
                     {printedInvoices.length === 0 ? (
                       <tr>
-                        <td colSpan="9" style={{ textAlign: 'center', padding: '2rem' }}>
+                        <td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>
                           No bills selected to print.
                         </td>
                       </tr>
@@ -1080,7 +1059,6 @@ const Reports = () => {
 
                           return (
                             <tr key={idx}>
-                              <td style={{ fontWeight: 700 }}>{inv.dealerName}</td>
                               <td style={{ fontWeight: 600 }}>{inv.invoiceNumber}</td>
                               <td style={{ textAlign: 'right' }}>₹{value.toLocaleString()}</td>
                               <td style={{ textAlign: 'center', fontWeight: 600, color: overdue > 0 && inv.status !== 'Paid' ? '#b91c1c' : 'black' }}>
@@ -1089,17 +1067,15 @@ const Reports = () => {
                               <td style={{ textAlign: 'right', fontWeight: 700 }}>₹{balance.toLocaleString()}</td>
                               <td>{inv.brand || '-'}</td>
                               <td>{new Date(inv.dateOfInvoice || inv.date).toLocaleDateString()}</td>
-                              <td>{inv.salesTeam || '-'}</td>
-                              <td>{inv.belt || '-'}</td>
                             </tr>
                           );
                         })}
                         <tr style={{ fontWeight: 800, background: '#f8fafc' }}>
-                          <td colSpan="2">Total</td>
+                          <td>Total</td>
                           <td style={{ textAlign: 'right' }}>₹{printedTotalInvoiced.toLocaleString()}</td>
                           <td></td>
                           <td style={{ textAlign: 'right', color: '#b91c1c' }}>₹{printedTotalOutstanding.toLocaleString()}</td>
-                          <td colSpan="4"></td>
+                          <td colSpan="2"></td>
                         </tr>
                       </>
                     )}

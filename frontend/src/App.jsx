@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { ToastProvider } from './context/ToastContext';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import DataEntry from './pages/DataEntry';
@@ -16,8 +17,9 @@ import Stock from './pages/Stock';
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
+    <ToastProvider>
+      <BrowserRouter>
+        <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="data-entry" element={<DataEntry />} />
@@ -33,9 +35,11 @@ function App() {
           <Route path="schemes" element={<Schemes />} />
           <Route path="stock" element={<Stock />} />
         </Route>
-      </Routes>
-    </BrowserRouter>
+        </Routes>
+      </BrowserRouter>
+    </ToastProvider>
   );
 }
 
 export default App;
+// Trigger hot reload update
