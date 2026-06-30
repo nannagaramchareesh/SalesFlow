@@ -112,15 +112,15 @@ const Reports = () => {
           width: 100% !important;
           border-collapse: collapse !important;
           table-layout: fixed !important;
-          font-size: 10px !important;
+          font-size: 12px !important;
           background: white !important;
           color: black !important;
         }
         
         .print-table th, .print-table td {
           border: 1px solid #cbd5e1 !important;
-          padding: 6px 8px !important;
-          font-size: 10px !important;
+          padding: 8px 10px !important;
+          font-size: 11px !important;
           word-wrap: break-word !important;
           white-space: normal !important;
         }
@@ -154,8 +154,9 @@ const Reports = () => {
             width: 100% !important;
             background: white !important;
             color: black !important;
-            padding: 0 !important;
+            padding: 40px 50px !important;
             margin: 0 !important;
+            box-sizing: border-box !important;
           }
         }
       `}</style>
@@ -273,6 +274,8 @@ const Reports = () => {
           clone.style.left = '-9999px';
           clone.style.top = '0';
           clone.style.width = '800px';
+          clone.style.boxSizing = 'border-box';
+          clone.style.padding = '40px 50px';
           clone.style.background = 'white';
           document.body.appendChild(clone);
 
@@ -280,7 +283,8 @@ const Reports = () => {
             const canvas = await html2canvas(clone, {
               scale: 2,
               useCORS: true,
-              logging: false
+              logging: false,
+              windowWidth: 800
             });
             document.body.removeChild(clone);
 

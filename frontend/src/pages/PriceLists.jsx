@@ -10,6 +10,7 @@ const PriceLists = () => {
   const [viewLoading, setViewLoading] = useState(null);
   const [selectedExcel, setSelectedExcel] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [excelSearchQuery, setExcelSearchQuery] = useState('');
   
   // Form State
   const [name, setName] = useState('');
@@ -182,9 +183,32 @@ const PriceLists = () => {
         const win = window.open();
         if (win) {
           win.document.write(
-            `<iframe src="${blobUrl}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`
+            `<html>
+              <head>
+                <title>${fullPriceList.name}</title>
+                <style>
+                  html, body {
+                    margin: 0;
+                    padding: 0;
+                    width: 100%;
+                    height: 100%;
+                    overflow: hidden;
+                    background-color: #f4f4f5;
+                  }
+                  iframe {
+                    width: 100%;
+                    height: 100%;
+                    border: none;
+                    display: block;
+                  }
+                </style>
+              </head>
+              <body>
+                <iframe src="${blobUrl}" allowfullscreen></iframe>
+              </body>
+            </html>`
           );
-          win.document.title = fullPriceList.name;
+          win.document.close();
         } else {
           window.open(blobUrl, '_blank');
         }
@@ -494,52 +518,113 @@ const PriceLists = () => {
       </div>
 
       {/* Excel Preview Modal Overlay */}
-      {selectedExcel && (
-        <div className="modal-overlay" onClick={() => setSelectedExcel(null)}>
-          <div className="modal-content" style={{ maxWidth: '90%', width: '1200px' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-title-group">
-                <h3>{selectedExcel.name}</h3>
+      {selectedExcel && (() => {
+        const maxCols = selectedExcel.data && selectedExcel.data.length > 0
+          ? Math.max(...selectedExcel.data.map(row => row ? row.length : 0), 0)
+          : 0;
+        
+        const query = excelSearchQuery.trim().toLowerCase();
+        const filteredRows = query
+          ? selectedExcel.data.slice(1).filter(row => 
+              row && row.some(cell => 
+                cell !== undefined && cell !== null && String(cell).toLowerCase().includes(query)
+              )
+            )
+          : selectedExcel.data.slice(1);
+
+        return (
+          <div className="modal-overlay" onClick={() => { setSelectedExcel(null); setExcelSearchQuery(''); }}>
+            <div className="modal-content" style={{ maxWidth: '90%', width: '1200px' }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <div className="modal-title-group">
+                  <h3>{selectedExcel.name}</h3>
+                </div>
+                <button className="modal-close-btn" onClick={() => { setSelectedExcel(null); setExcelSearchQuery(''); }}>
+                  <X size={20} />
+                </button>
               </div>
-              <button className="modal-close-btn" onClick={() => setSelectedExcel(null)}>
-                <X size={20} />
-              </button>
-            </div>
-            <div className="modal-body" style={{ overflow: 'auto', maxHeight: '70vh', padding: '1rem', background: '#f8fafc' }}>
-              <div style={{ background: 'white', borderRadius: '6px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                  <thead>
-                    <tr style={{ background: '#e2e8f0', borderBottom: '2px solid #cbd5e1' }}>
-                      {selectedExcel.data[0] && selectedExcel.data[0].map((col, idx) => (
-                        <th key={idx} style={{ padding: '0.75rem 1rem', borderRight: '1px solid #cbd5e1', textAlign: 'left', fontWeight: 600, color: '#334155' }}>
-                          {col !== undefined && col !== null ? String(col) : `Column ${idx + 1}`}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedExcel.data.slice(1).map((row, rowIdx) => {
-                      const maxCols = selectedExcel.data[0] ? selectedExcel.data[0].length : 0;
-                      return (
-                        <tr key={rowIdx} style={{ borderBottom: '1px solid #e2e8f0', background: rowIdx % 2 === 0 ? 'white' : '#f8fafc' }}>
-                          {Array.from({ length: maxCols }).map((_, cellIdx) => {
-                            const cell = row[cellIdx];
-                            return (
-                              <td key={cellIdx} style={{ padding: '0.75rem 1rem', borderRight: '1px solid #e2e8f0', color: '#475569' }}>
-                                {cell !== undefined && cell !== null ? String(cell) : ''}
-                              </td>
-                            );
-                          })}
+
+              {/* Search option in Excel Viewer */}
+              <div className="modal-search-wrapper" style={{ padding: '0.75rem 1rem', background: '#f1f5f9', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <Search size={16} color="#64748b" style={{ flexShrink: 0 }} />
+                <input 
+                  type="text" 
+                  placeholder="Search in sheet..." 
+                  value={excelSearchQuery}
+                  onChange={e => setExcelSearchQuery(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '0.4rem 0.75rem',
+                    borderRadius: '4px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    background: 'white'
+                  }}
+                />
+                {excelSearchQuery && (
+                  <button 
+                    onClick={() => setExcelSearchQuery('')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#64748b',
+                      cursor: 'pointer',
+                      padding: '0.2rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+
+              <div className="modal-body" style={{ overflow: 'auto', maxHeight: '70vh', padding: '1rem', background: '#f8fafc' }}>
+                <div style={{ background: 'white', borderRadius: '6px', border: '1px solid var(--border-color)', overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+                    <thead>
+                      <tr style={{ background: '#e2e8f0', borderBottom: '2px solid #cbd5e1' }}>
+                        {Array.from({ length: maxCols }).map((_, idx) => {
+                          const col = selectedExcel.data[0] ? selectedExcel.data[0][idx] : '';
+                          return (
+                            <th key={idx} style={{ padding: '0.75rem 1rem', borderRight: '1px solid #cbd5e1', textAlign: 'left', fontWeight: 600, color: '#334155' }}>
+                              {col !== undefined && col !== null && String(col).trim() !== '' ? String(col) : `Column ${idx + 1}`}
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredRows.length === 0 ? (
+                        <tr>
+                          <td colSpan={maxCols} style={{ padding: '2rem', textAlign: 'center', color: '#64748b', background: 'white' }}>
+                            No results match "{excelSearchQuery}"
+                          </td>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      ) : (
+                        filteredRows.map((row, rowIdx) => (
+                          <tr key={rowIdx} style={{ borderBottom: '1px solid #e2e8f0', background: rowIdx % 2 === 0 ? 'white' : '#f8fafc' }}>
+                            {Array.from({ length: maxCols }).map((_, cellIdx) => {
+                              const cell = row ? row[cellIdx] : '';
+                              return (
+                                <td key={cellIdx} style={{ padding: '0.75rem 1rem', borderRight: '1px solid #e2e8f0', color: '#475569' }}>
+                                  {cell !== undefined && cell !== null ? String(cell) : ''}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Image Preview Modal Overlay */}
       {selectedImage && (
