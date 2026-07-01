@@ -11,6 +11,7 @@ const Reports = () => {
   const [selectedInvoices, setSelectedInvoices] = useState({});
   const [viewMode, setViewMode] = useState('dealers'); // 'dealers' or 'all_bills'
   const [sharingPdf, setSharingPdf] = useState(false);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   // Dealer view filters
   const [dealerSearch, setDealerSearch] = useState('');
@@ -371,14 +372,14 @@ const Reports = () => {
             {/* View Mode Toggle */}
             <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }} className="no-print">
               <button
-                onClick={() => { setViewMode('dealers'); setSelectedDealer(''); }}
+                onClick={() => { setViewMode('dealers'); setSelectedDealer(''); setShowMobileFilters(false); }}
                 className={`btn ${viewMode === 'dealers' ? 'btn-primary' : 'btn-secondary'}`}
                 style={{ fontWeight: 600, gap: '0.35rem' }}
               >
                 📂 Group by Dealers
               </button>
               <button
-                onClick={() => setViewMode('all_bills')}
+                onClick={() => { setViewMode('all_bills'); setShowMobileFilters(false); }}
                 className={`btn ${viewMode === 'all_bills' ? 'btn-primary' : 'btn-secondary'}`}
                 style={{ fontWeight: 600, gap: '0.35rem' }}
               >
@@ -394,67 +395,79 @@ const Reports = () => {
                 </div>
 
                 {/* Dealer Filters Bar */}
-                <div style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: '1rem',
-                  marginBottom: '1.5rem',
-                  background: '#f8fafc',
-                  padding: '1rem',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-color)',
-                  alignItems: 'center'
-                }}>
-                  <div style={{ flex: '1', minWidth: '200px' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Search Dealer</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
-                      value={dealerSearch}
-                      onChange={e => setDealerSearch(e.target.value)}
-                      placeholder="Search by dealer name..."
-                    />
-                  </div>
-                  <div style={{ minWidth: '180px' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Outstanding Balance</label>
-                    <select
-                      className="form-input"
-                      style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
-                      value={dealerBalanceFilter}
-                      onChange={e => setDealerBalanceFilter(e.target.value)}
-                    >
-                      <option value="all">All Dealers</option>
-                      <option value="outstanding">With Outstanding (&gt; ₹0)</option>
-                      <option value="zero">No Outstanding (₹0)</option>
-                    </select>
-                  </div>
-                  <div style={{ minWidth: '180px' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Overdue Status</label>
-                    <select
-                      className="form-input"
-                      style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
-                      value={dealerOverdueFilter}
-                      onChange={e => setDealerOverdueFilter(e.target.value)}
-                    >
-                      <option value="all">All Dealers</option>
-                      <option value="has_overdue">With Overdue Bills</option>
-                      <option value="no_overdue">No Overdue Bills</option>
-                    </select>
-                  </div>
-                  {(dealerSearch || dealerBalanceFilter !== 'all' || dealerOverdueFilter !== 'all') && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                    <div style={{ flex: 1 }}>
+                      <input
+                        type="text"
+                        className="form-input"
+                        style={{ padding: '0.6rem 0.85rem', fontSize: '0.85rem', width: '100%', borderRadius: '8px', border: '1px solid var(--border-color)' }}
+                        value={dealerSearch}
+                        onChange={e => setDealerSearch(e.target.value)}
+                        placeholder="Search by dealer name..."
+                      />
+                    </div>
                     <button
-                      className="btn btn-secondary"
-                      style={{ fontSize: '0.8rem', alignSelf: 'flex-end', height: '36px', padding: '0 1rem', display: 'inline-flex', alignItems: 'center' }}
-                      onClick={() => {
-                        setDealerSearch('');
-                        setDealerBalanceFilter('all');
-                        setDealerOverdueFilter('all');
-                      }}
+                      type="button"
+                      className="btn btn-secondary mobile-filter-toggle-btn"
+                      onClick={() => setShowMobileFilters(!showMobileFilters)}
+                      style={{ margin: 0, width: 'auto', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
                     >
-                      Reset
+                      ⚙️ {showMobileFilters ? 'Hide Filters' : 'Filters'}
+                      {(dealerBalanceFilter !== 'all' || dealerOverdueFilter !== 'all') && ' (Active)'}
                     </button>
-                  )}
+                  </div>
+
+                  <div className={`filters-container-box ${showMobileFilters ? 'mobile-open' : ''}`} style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '1rem',
+                    background: '#f8fafc',
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-color)',
+                    alignItems: 'center'
+                  }}>
+                    <div style={{ minWidth: '180px', flex: '1' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Outstanding Balance</label>
+                      <select
+                        className="form-input"
+                        style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                        value={dealerBalanceFilter}
+                        onChange={e => setDealerBalanceFilter(e.target.value)}
+                      >
+                        <option value="all">All Dealers</option>
+                        <option value="outstanding">With Outstanding (&gt; ₹0)</option>
+                        <option value="zero">No Outstanding (₹0)</option>
+                      </select>
+                    </div>
+                    <div style={{ minWidth: '180px', flex: '1' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Overdue Status</label>
+                      <select
+                        className="form-input"
+                        style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                        value={dealerOverdueFilter}
+                        onChange={e => setDealerOverdueFilter(e.target.value)}
+                      >
+                        <option value="all">All Dealers</option>
+                        <option value="has_overdue">With Overdue Bills</option>
+                        <option value="no_overdue">No Overdue Bills</option>
+                      </select>
+                    </div>
+                    {(dealerSearch || dealerBalanceFilter !== 'all' || dealerOverdueFilter !== 'all') && (
+                      <button
+                        className="btn btn-secondary"
+                        style={{ fontSize: '0.8rem', alignSelf: 'flex-end', height: '36px', padding: '0 1rem', display: 'inline-flex', alignItems: 'center' }}
+                        onClick={() => {
+                          setDealerSearch('');
+                          setDealerBalanceFilter('all');
+                          setDealerOverdueFilter('all');
+                        }}
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {uniqueDealers.length === 0 ? (
@@ -595,7 +608,7 @@ const Reports = () => {
                 <div style={{ marginBottom: '1.5rem' }} className="no-print">
                   <button 
                     className="btn btn-secondary" 
-                    onClick={() => { setSelectedDealer(''); setViewMode('dealers'); }}
+                    onClick={() => { setSelectedDealer(''); setViewMode('dealers'); setShowMobileFilters(false); }}
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginBottom: '1.25rem', padding: '0.5rem 1rem' }}
                   >
                     ← Back to Dealers List
@@ -631,28 +644,52 @@ const Reports = () => {
                 </div>
 
                 {/* Invoices Filters Bar */}
-                <div style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: '1rem',
-                  marginBottom: '1.25rem',
-                  background: '#f8fafc',
-                  padding: '1rem',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-color)',
-                  alignItems: 'center'
-                }} className="no-print">
-                  <div style={{ flex: '1', minWidth: '180px' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Search Bill No.</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
-                      value={invoiceSearch}
-                      onChange={e => setInvoiceSearch(e.target.value)}
-                      placeholder="Search by bill number..."
-                    />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }} className="no-print">
+                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                    <div style={{ flex: 1 }}>
+                      <input
+                        type="text"
+                        className="form-input"
+                        style={{ padding: '0.6rem 0.85rem', fontSize: '0.85rem', width: '100%', borderRadius: '8px', border: '1px solid var(--border-color)' }}
+                        value={invoiceSearch}
+                        onChange={e => setInvoiceSearch(e.target.value)}
+                        placeholder="Search by bill number..."
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-secondary mobile-filter-toggle-btn"
+                      onClick={() => setShowMobileFilters(!showMobileFilters)}
+                      style={{ margin: 0, width: 'auto', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                    >
+                      ⚙️ {showMobileFilters ? 'Hide Filters' : 'Filters'}
+                      {(() => {
+                        const activeCount = 
+                          (invoiceStatusFilter !== 'all' ? 1 : 0) +
+                          (invoiceSalesTeamFilter !== 'all' ? 1 : 0) +
+                          (invoiceBeltFilter !== 'all' ? 1 : 0) +
+                          (invoiceMonthFilter !== 'all' ? 1 : 0) +
+                          (invoiceBalanceStatusFilter !== 'all' ? 1 : 0) +
+                          (invoiceOverdueFilter !== 'all' ? 1 : 0) +
+                          (invoiceBrandFilter !== 'all' ? 1 : 0) +
+                          (invoiceDealerFilter !== 'all' ? 1 : 0) +
+                          (invoiceOverdueSort !== 'none' ? 1 : 0) +
+                          (invoiceBalanceSort !== 'none' ? 1 : 0);
+                        return activeCount > 0 ? ` (${activeCount})` : '';
+                      })()}
+                    </button>
                   </div>
+
+                  <div className={`filters-container-box ${showMobileFilters ? 'mobile-open' : ''}`} style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '1rem',
+                    background: '#f8fafc',
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-color)',
+                    alignItems: 'center'
+                  }}>
                   {isAllBills && (
                     <div style={{ minWidth: '180px', flex: '1' }}>
                       <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Dealer</label>
@@ -822,6 +859,7 @@ const Reports = () => {
                   </button>
                 )}
               </div>
+            </div>
 
               {/* Selection Summary Bar */}
               {selectedDealerInvoices.length > 0 && (
