@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getInvoices, updateInvoice } from '../utils/api';
+import { Search, Filter } from 'lucide-react';
 
 const InvoiceImage = () => {
   const [invoices, setInvoices] = useState([]);
@@ -8,6 +9,10 @@ const InvoiceImage = () => {
   const [saving, setSaving] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [isZoomed, setIsZoomed] = useState(false);
+
+  // Filter and search states
+  const [dealerFilter, setDealerFilter] = useState('');
+  const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('');
 
   useEffect(() => {
     loadInvoices();
@@ -26,6 +31,18 @@ const InvoiceImage = () => {
   };
 
   const selectedInvoice = invoices.find(inv => inv._id === selectedInvoiceId);
+
+  // Derive unique list of dealers for filtering
+  const uniqueDealers = [...new Set(invoices.map(inv => inv.dealerName))].filter(Boolean).sort();
+
+  // Filter invoices based on selected dealer and search query
+  const filteredInvoices = invoices.filter(inv => {
+    const matchesDealer = !dealerFilter || inv.dealerName === dealerFilter;
+    const invoiceNumStr = inv.invoiceNumber ? String(inv.invoiceNumber) : '';
+    const matchesSearch = !invoiceSearchQuery || 
+      invoiceNumStr.toLowerCase().includes(invoiceSearchQuery.toLowerCase());
+    return matchesDealer && matchesSearch;
+  });
 
   // Set image preview when selected invoice changes
   useEffect(() => {
@@ -133,7 +150,49 @@ const InvoiceImage = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
         <div className="card">
-          <h2 style={{ marginBottom: '1rem', fontSize: '1.125rem' }}>Step 1: Select Invoice Number</h2>
+          <h2 style={{ marginBottom: '1.25rem', fontSize: '1.125rem' }}>Step 1: Select Invoice Number</h2>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Filter size={14} /> Filter by Dealer
+              </label>
+              <select
+                value={dealerFilter}
+                onChange={(e) => {
+                  setDealerFilter(e.target.value);
+                  setSelectedInvoiceId('');
+                }}
+                className="form-input"
+                style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', cursor: 'pointer' }}
+              >
+                <option value="">-- All Dealers --</option>
+                {uniqueDealers.map((dealer) => (
+                  <option key={dealer} value={dealer}>
+                    {dealer}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Search size={14} /> Search Invoice Number
+              </label>
+              <input
+                type="text"
+                placeholder="Type invoice no..."
+                value={invoiceSearchQuery}
+                onChange={(e) => {
+                  setInvoiceSearchQuery(e.target.value);
+                  setSelectedInvoiceId('');
+                }}
+                className="form-input"
+                style={{ width: '100%', padding: '0.75rem', borderRadius: '8px' }}
+              />
+            </div>
+          </div>
+
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>
               Choose Invoice to Attach Image
@@ -144,13 +203,33 @@ const InvoiceImage = () => {
               className="form-input"
               style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', cursor: 'pointer' }}
             >
-              <option value="">-- Choose Invoice --</option>
-              {invoices.map((inv) => (
+              <option value="">
+                {filteredInvoices.length === 0 ? 'No invoices found' : '-- Choose Invoice --'}
+              </option>
+              {filteredInvoices.map((inv) => (
                 <option key={inv._id} value={inv._id}>
                   {inv.invoiceNumber} | {inv.dealerName} (₹{(inv.invoiceValue || 0).toLocaleString()})
                 </option>
               ))}
             </select>
+            {(dealerFilter || invoiceSearchQuery) && (
+              <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                  Found {filteredInvoices.length} matching {filteredInvoices.length === 1 ? 'invoice' : 'invoices'}
+                </span>
+                <button
+                  onClick={() => {
+                    setDealerFilter('');
+                    setInvoiceSearchQuery('');
+                    setSelectedInvoiceId('');
+                  }}
+                  className="btn btn-secondary"
+                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', borderRadius: '4px' }}
+                >
+                  Clear Filters
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

@@ -171,7 +171,8 @@ const Reports = () => {
         const uniqueMonthsList = [...new Set(invoices.map(inv => inv.month).filter(Boolean))].sort();
 
         let filteredInvoices = dealerInvoices.filter(inv => {
-          if (invoiceSearch && !inv.invoiceNumber.toLowerCase().includes(invoiceSearch.toLowerCase())) return false;
+          const invoiceNumStr = inv.invoiceNumber ? String(inv.invoiceNumber) : '';
+          if (invoiceSearch && !invoiceNumStr.toLowerCase().includes(invoiceSearch.toLowerCase())) return false;
           if (invoiceStatusFilter !== 'all' && inv.status !== invoiceStatusFilter) return false;
           if (invoiceBrandFilter !== 'all' && inv.brand !== invoiceBrandFilter) return false;
           if (isAllBills && invoiceDealerFilter !== 'all' && inv.dealerName !== invoiceDealerFilter) return false;

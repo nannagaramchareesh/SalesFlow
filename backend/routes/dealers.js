@@ -242,6 +242,43 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Bulk create dealers
+router.post('/bulk', async (req, res) => {
+  try {
+    if (!Array.isArray(req.body)) {
+      return res.status(400).json({ message: 'Request body must be an array' });
+    }
+    
+    // Clean and validate
+    const dealersToInsert = req.body
+      .map(d => ({
+        name: d.name ? d.name.trim() : '',
+        salesTeam: d.salesTeam ? d.salesTeam.trim() : '',
+        belt: d.belt ? d.belt.trim() : '',
+        contactNumber: d.contactNumber ? String(d.contactNumber).trim() : ''
+      }))
+      .filter(d => d.name && d.salesTeam && d.belt);
+
+    if (dealersToInsert.length === 0) {
+      return res.status(400).json({ message: 'No valid dealers provided (name, salesTeam, and belt are required).' });
+    }
+
+    const newDealers = await Dealer.insertMany(dealersToInsert, { ordered: false });
+    res.status(201).json(newDealers);
+  } catch (err) {
+    if (err.name === 'BulkWriteError' || err.writeErrors) {
+      const insertedCount = err.result ? err.result.nInserted : 0;
+      res.status(207).json({
+        message: 'Some dealers failed to insert (possibly duplicates).',
+        insertedCount,
+        errors: (err.writeErrors || []).map(e => e.errmsg)
+      });
+    } else {
+      res.status(400).json({ message: err.message });
+    }
+  }
+});
+
 // Update a dealer
 router.put('/:id', async (req, res) => {
   try {

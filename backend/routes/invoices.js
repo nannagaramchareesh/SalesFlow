@@ -89,7 +89,8 @@ router.post('/:id/payments', async (req, res) => {
       paymentMode: req.body.paymentMode,
       instrument: req.body.instrument,
       chequeNumber: req.body.chequeNumber,
-      chequeDate: req.body.chequeDate
+      chequeDate: req.body.chequeDate,
+      chequeImage: req.body.chequeImage
     });
 
     const updatedInvoice = await invoice.save();

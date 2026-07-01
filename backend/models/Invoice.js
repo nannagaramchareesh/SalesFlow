@@ -26,6 +26,7 @@ const invoiceSchema = mongoose.Schema(
       instrument: { type: String }, // RTGS, Cash, Cheque
       chequeNumber: { type: String },
       chequeDate: { type: Date },
+      chequeImage: { type: String },
       isBounced: { type: Boolean, default: false },
       bouncedDate: { type: Date }
     }]

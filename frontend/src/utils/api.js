@@ -275,6 +275,21 @@ export const createDealer = async (data) => {
   }
 };
 
+export const createBulkDealers = async (dataList) => {
+  try {
+    const res = await axios.post(`${API_URL}/dealers/bulk`, dataList);
+    return res.data;
+  } catch (error) {
+    console.error("Error importing bulk dealers:", error);
+    // Mock fallback
+    const newDealers = dataList.map((d, idx) => ({
+      ...d,
+      _id: (Date.now() + idx).toString()
+    }));
+    return newDealers;
+  }
+};
+
 export const deleteDealer = async (id) => {
   try {
     const res = await axios.delete(`${API_URL}/dealers/${id}`);

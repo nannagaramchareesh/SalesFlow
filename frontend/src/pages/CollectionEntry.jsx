@@ -106,6 +106,61 @@ const CollectionEntry = () => {
     return true;
   });
 
+  const compressImage = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          const MAX_WIDTH = 1000;
+          const MAX_HEIGHT = 1000;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          resolve(compressedDataUrl);
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
+  const handleChequeImageChange = async (invoiceId, e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      const base64Image = await compressImage(file);
+      handlePaymentChange(invoiceId, 'chequeImage', base64Image);
+    } catch (error) {
+      alert('Error processing image. Please try again.');
+      console.error(error);
+    }
+  };
+
   const handlePaymentChange = (invoiceId, field, value) => {
     setPaymentForms(prev => ({
       ...prev,
@@ -135,7 +190,8 @@ const CollectionEntry = () => {
       paymentMode: mode,
       instrument: selectedMode,
       chequeNumber: selectedMode === 'Cheque' ? (form.chequeNumber || '') : '',
-      chequeDate: selectedMode === 'Cheque' ? (form.chequeDate || '') : ''
+      chequeDate: selectedMode === 'Cheque' ? (form.chequeDate || '') : '',
+      chequeImage: selectedMode === 'Cheque' ? (form.chequeImage || '') : ''
     };
 
     try {
@@ -529,7 +585,8 @@ const CollectionEntry = () => {
           const uniqueMonthsList = [...new Set(invoices.map(inv => inv.month).filter(Boolean))].sort();
 
           let filteredInvoices = dealerInvoices.filter(inv => {
-            if (invoiceSearch && !inv.invoiceNumber.toLowerCase().includes(invoiceSearch.toLowerCase())) {
+            const invoiceNumStr = inv.invoiceNumber ? String(inv.invoiceNumber) : '';
+            if (invoiceSearch && !invoiceNumStr.toLowerCase().includes(invoiceSearch.toLowerCase())) {
               return false;
             }
 
@@ -1109,7 +1166,59 @@ const CollectionEntry = () => {
                                   <input type="number" placeholder="Amt (₹)" className="form-input" style={{ padding: '0.4rem', fontSize: '0.8rem', minWidth: '100px' }} value={form.amount || ''} onChange={e => handlePaymentChange(inv._id, 'amount', e.target.value)} />
                                 </td>
                                 <td style={{ padding: '0.5rem' }}>
-                                  <input type="text" placeholder="Chq No." className="form-input" disabled={form.paymentMode !== 'Cheque'} style={{ padding: '0.4rem', fontSize: '0.8rem', minWidth: '100px', opacity: form.paymentMode !== 'Cheque' ? 0.5 : 1 }} value={form.chequeNumber || ''} onChange={e => handlePaymentChange(inv._id, 'chequeNumber', e.target.value)} />
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                    <input type="text" placeholder="Chq No." className="form-input" disabled={form.paymentMode !== 'Cheque'} style={{ padding: '0.4rem', fontSize: '0.8rem', minWidth: '100px', opacity: form.paymentMode !== 'Cheque' ? 0.5 : 1 }} value={form.chequeNumber || ''} onChange={e => handlePaymentChange(inv._id, 'chequeNumber', e.target.value)} />
+                                    {form.paymentMode === 'Cheque' && (
+                                      <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                                        <input 
+                                          type="file" 
+                                          accept="image/*" 
+                                          capture="environment" 
+                                          onChange={e => handleChequeImageChange(inv._id, e)} 
+                                          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                                        />
+                                        <button 
+                                          type="button" 
+                                          className="btn" 
+                                          style={{ 
+                                            padding: '0.35rem 0.45rem', 
+                                            fontSize: '0.85rem', 
+                                            background: form.chequeImage ? '#dcfce7' : '#f1f5f9', 
+                                            color: form.chequeImage ? '#15803d' : '#475569', 
+                                            border: form.chequeImage ? '1px solid #bbf7d0' : '1px solid #cbd5e1', 
+                                            borderRadius: '6px',
+                                            cursor: 'pointer',
+                                            minWidth: 'auto',
+                                            height: '28px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                          }}
+                                          title={form.chequeImage ? "Cheque photo attached" : "Attach/Take Cheque Photo"}
+                                        >
+                                          📷
+                                        </button>
+                                      </div>
+                                    )}
+                                    {form.paymentMode === 'Cheque' && form.chequeImage && (
+                                      <button 
+                                        type="button" 
+                                        onClick={() => setZoomedImageUrl(form.chequeImage)}
+                                        style={{ 
+                                          background: 'none', 
+                                          border: 'none', 
+                                          padding: 0, 
+                                          cursor: 'pointer', 
+                                          fontSize: '0.9rem',
+                                          display: 'flex',
+                                          alignItems: 'center'
+                                        }}
+                                        title="Preview Cheque Image"
+                                      >
+                                        👁️
+                                      </button>
+                                    )}
+                                  </div>
                                 </td>
                                 <td style={{ padding: '0.5rem' }}>
                                   <input type="date" className="form-input" disabled={form.paymentMode !== 'Cheque'} style={{ padding: '0.4rem', fontSize: '0.8rem', minWidth: '130px', opacity: form.paymentMode !== 'Cheque' ? 0.5 : 1 }} value={form.chequeDate || ''} onChange={e => handlePaymentChange(inv._id, 'chequeDate', e.target.value)} />
@@ -1320,16 +1429,58 @@ const CollectionEntry = () => {
                                   </div>
 
                                   {form.paymentMode === 'Cheque' && (
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                                      <div>
-                                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Cheque Number</label>
-                                        <input type="text" placeholder="Chq No." className="form-input" style={{ width: '100%', padding: '0.45rem' }} value={form.chequeNumber || ''} onChange={e => handlePaymentChange(inv._id, 'chequeNumber', e.target.value)} />
+                                    <>
+                                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                                        <div>
+                                          <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Cheque Number</label>
+                                          <input type="text" placeholder="Chq No." className="form-input" style={{ width: '100%', padding: '0.45rem' }} value={form.chequeNumber || ''} onChange={e => handlePaymentChange(inv._id, 'chequeNumber', e.target.value)} />
+                                        </div>
+                                        <div>
+                                          <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Cheque Date</label>
+                                          <input type="date" className="form-input" style={{ width: '100%', padding: '0.45rem' }} value={form.chequeDate || ''} onChange={e => handlePaymentChange(inv._id, 'chequeDate', e.target.value)} />
+                                        </div>
                                       </div>
-                                      <div>
-                                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Cheque Date</label>
-                                        <input type="date" className="form-input" style={{ width: '100%', padding: '0.45rem' }} value={form.chequeDate || ''} onChange={e => handlePaymentChange(inv._id, 'chequeDate', e.target.value)} />
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Cheque Photo</label>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                          <div style={{ position: 'relative', flex: 1 }}>
+                                            <input 
+                                              type="file" 
+                                              accept="image/*" 
+                                              capture="environment" 
+                                              onChange={e => handleChequeImageChange(inv._id, e)} 
+                                              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                                            />
+                                            <button 
+                                              type="button" 
+                                              className="btn btn-secondary" 
+                                              style={{ 
+                                                width: '100%', 
+                                                padding: '0.45rem', 
+                                                fontSize: '0.8rem', 
+                                                background: form.chequeImage ? '#dcfce7' : '#f8fafc', 
+                                                color: form.chequeImage ? '#15803d' : 'var(--text-secondary)', 
+                                                border: form.chequeImage ? '1px solid #bbf7d0' : '1px solid var(--border-color)',
+                                                fontWeight: 600
+                                              }}
+                                            >
+                                              📷 {form.chequeImage ? 'Change Cheque Photo' : 'Take or Attach Cheque Photo'}
+                                            </button>
+                                          </div>
+                                          {form.chequeImage && (
+                                            <button 
+                                              type="button" 
+                                              onClick={() => setZoomedImageUrl(form.chequeImage)}
+                                              className="btn"
+                                              style={{ padding: '0.45rem', background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8' }}
+                                              title="Preview Cheque Image"
+                                            >
+                                              👁️ Preview
+                                            </button>
+                                          )}
+                                        </div>
                                       </div>
-                                    </div>
+                                    </>
                                   )}
 
                                   <button 
@@ -1448,6 +1599,32 @@ const CollectionEntry = () => {
                               <span className="timeline-detail-label">Cheque Date</span>
                               <span className="timeline-detail-value" style={p.isBounced ? { textDecoration: 'line-through', color: '#94a3b8' } : {}}>
                                 {new Date(p.chequeDate).toLocaleDateString()}
+                              </span>
+                            </div>
+                          )}
+                          {p.chequeImage && (
+                            <div className="timeline-detail-col">
+                              <span className="timeline-detail-label">Cheque Image</span>
+                              <span className="timeline-detail-value">
+                                <button 
+                                  type="button" 
+                                  onClick={() => setZoomedImageUrl(p.chequeImage)}
+                                  style={{ 
+                                    background: 'none', 
+                                    border: 'none', 
+                                    padding: 0, 
+                                    cursor: 'pointer', 
+                                    fontSize: '0.85rem',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.15rem',
+                                    color: 'var(--primary-color)',
+                                    fontWeight: 600
+                                  }}
+                                  title="View Cheque Image"
+                                >
+                                  📷 View
+                                </button>
                               </span>
                             </div>
                           )}
