@@ -651,6 +651,48 @@ tr:hover {
   color: #334155;
 }
 
+@media (max-width: 480px) {
+  .modal-content {
+    max-height: 95vh;
+  }
+  .modal-body {
+    padding: 1rem;
+  }
+  .progress-meta-grid {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+    text-align: left;
+  }
+  .progress-meta-item {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px dashed var(--border-color);
+    padding-bottom: 0.25rem;
+  }
+  .timeline-container {
+    padding-left: 1.25rem;
+  }
+  .timeline-container::before {
+    left: 4px;
+  }
+  .timeline-marker {
+    left: -1.25rem;
+    width: 12px;
+    height: 12px;
+    top: 8px;
+    border-width: 2px;
+  }
+  .timeline-content-card {
+    padding: 0.6rem 0.85rem;
+  }
+  .timeline-item-details {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem 0.75rem;
+  }
+}
+
 /* Animations */
 @keyframes fadeIn {
   from { opacity: 0; }
