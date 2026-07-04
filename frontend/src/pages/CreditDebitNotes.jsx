@@ -39,6 +39,23 @@ const CreditDebitNotes = () => {
     }
   };
 
+  const getMimeType = (fileName, fileType) => {
+    if (fileType) return fileType;
+    const ext = fileName.toLowerCase().split('.').pop();
+    switch (ext) {
+      case 'pdf': return 'application/pdf';
+      case 'xls': return 'application/vnd.ms-excel';
+      case 'xlsx': return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case 'csv': return 'text/csv';
+      case 'jpg':
+      case 'jpeg': return 'image/jpeg';
+      case 'png': return 'image/png';
+      case 'webp': return 'image/webp';
+      case 'gif': return 'image/gif';
+      default: return 'application/octet-stream';
+    }
+  };
+
   const handleFileChange = (e) => {
     const selected = e.target.files[0];
     setFileError('');
@@ -47,9 +64,15 @@ const CreditDebitNotes = () => {
       return;
     }
     
-    // Validate file type (PDF only as requested)
+    // Check file size (limit to 10MB)
+    if (selected.size > 10 * 1024 * 1024) {
+      setFileError('File size must be less than 10MB');
+      setFile(null);
+      e.target.value = null;
+      return;
+    }
     
-    // Validate file type (PDF only as requested)
+    // Validate file type (PDF, Excel, Images)
     const extension = selected.name.split('.').pop().toLowerCase();
     const validExtensions = ['pdf', 'xls', 'xlsx', 'csv', 'jpg', 'jpeg', 'png', 'webp', 'gif'];
     if (!validExtensions.includes(extension)) {
@@ -74,7 +97,7 @@ const CreditDebitNotes = () => {
       return;
     }
     if (!file) {
-      alert('Please select a PDF file.');
+      alert('Please select a file.');
       return;
     }
 
@@ -85,11 +108,18 @@ const CreditDebitNotes = () => {
     reader.readAsDataURL(file);
     reader.onload = async () => {
       try {
+        let fileData = reader.result;
+        const mimeType = file.type || getMimeType(file.name, file.type);
+        
+        if (fileData.startsWith('data:;base64,')) {
+          fileData = fileData.replace('data:;base64,', `data:${mimeType};base64,`);
+        }
+
         const payload = {
           name: name.trim(),
           fileName: file.name,
-          fileType: file.type || 'application/pdf',
-          fileData: reader.result
+          fileType: mimeType,
+          fileData: fileData
         };
         
         await createNote(payload);
@@ -135,7 +165,7 @@ const CreditDebitNotes = () => {
       
       const base64Data = fullNote.fileData;
       const parts = base64Data.split(';base64,');
-      const contentType = parts[0].split(':')[1];
+      const contentType = parts[0].split(':')[1] || fullNote.fileType || getMimeType(fullNote.fileName, '');
       const raw = window.atob(parts[1]);
       const rawLength = raw.length;
       const uInt8Array = new Uint8Array(rawLength);
@@ -169,7 +199,7 @@ const CreditDebitNotes = () => {
       
       const base64Data = fullNote.fileData;
       const parts = base64Data.split(';base64,');
-      const contentType = parts[0].split(':')[1];
+      const contentType = parts[0].split(':')[1] || fullNote.fileType || getMimeType(fullNote.fileName, '');
       const raw = window.atob(parts[1]);
       const rawLength = raw.length;
       const uInt8Array = new Uint8Array(rawLength);

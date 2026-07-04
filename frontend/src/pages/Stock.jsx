@@ -70,6 +70,18 @@ const Stock = () => {
     }
   };
 
+  const getMimeType = (fileName, fileType) => {
+    if (fileType) return fileType;
+    const ext = fileName.toLowerCase().split('.').pop();
+    switch (ext) {
+      case 'pdf': return 'application/pdf';
+      case 'xls': return 'application/vnd.ms-excel';
+      case 'xlsx': return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case 'csv': return 'text/csv';
+      default: return 'application/octet-stream';
+    }
+  };
+
   const handleUploadSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim()) {
@@ -88,11 +100,18 @@ const Stock = () => {
     reader.readAsDataURL(file);
     reader.onload = async () => {
       try {
+        let fileData = reader.result;
+        const mimeType = file.type || getMimeType(file.name, file.type);
+        
+        if (fileData.startsWith('data:;base64,')) {
+          fileData = fileData.replace('data:;base64,', `data:${mimeType};base64,`);
+        }
+
         const payload = {
           name: name.trim(),
           fileName: file.name,
-          fileType: file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          fileData: reader.result
+          fileType: mimeType,
+          fileData: fileData
         };
         
         await createStock(payload);
@@ -138,7 +157,7 @@ const Stock = () => {
       
       const base64Data = fullStock.fileData;
       const parts = base64Data.split(';base64,');
-      const contentType = parts[0].split(':')[1];
+      const contentType = parts[0].split(':')[1] || fullStock.fileType || getMimeType(fullStock.fileName, '');
       const raw = window.atob(parts[1]);
       const rawLength = raw.length;
       const uInt8Array = new Uint8Array(rawLength);
@@ -172,7 +191,7 @@ const Stock = () => {
       
       const base64Data = fullStock.fileData;
       const parts = base64Data.split(';base64,');
-      const contentType = parts[0].split(':')[1];
+      const contentType = parts[0].split(':')[1] || fullStock.fileType || getMimeType(fullStock.fileName, '');
       const raw = window.atob(parts[1]);
       const rawLength = raw.length;
       const uInt8Array = new Uint8Array(rawLength);

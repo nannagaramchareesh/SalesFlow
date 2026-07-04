@@ -9,7 +9,8 @@ const Reports = () => {
   const [loading, setLoading] = useState(true);
   const [selectedDealer, setSelectedDealer] = useState('');
   const [selectedInvoices, setSelectedInvoices] = useState({});
-  const [viewMode, setViewMode] = useState('dealers'); // 'dealers' or 'all_bills'
+  const [viewMode, setViewMode] = useState('dealers'); // 'dealers', 'all_bills', or 'total_outstanding'
+  const [expandedDealer, setExpandedDealer] = useState(null);
   const [sharingPdf, setSharingPdf] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
@@ -164,7 +165,9 @@ const Reports = () => {
 
       {(() => {
         const isAllBills = viewMode === 'all_bills';
-        const dealerInvoices = isAllBills ? invoices : invoices.filter(inv => inv.dealerName === selectedDealer);
+        const isOutstandingMode = viewMode === 'total_outstanding';
+        const isAllBillsOrOutstanding = isAllBills || isOutstandingMode;
+        const dealerInvoices = isAllBillsOrOutstanding ? invoices : invoices.filter(inv => inv.dealerName === selectedDealer);
         const uniqueBrands = [...new Set(dealerInvoices.map(inv => inv.brand).filter(Boolean))];
         const uniqueDealersList = [...new Set(invoices.map(inv => inv.dealerName).filter(Boolean))].sort();
         const uniqueSalesTeamsList = [...new Set(invoices.map(inv => inv.salesTeam).filter(Boolean))].sort();
@@ -176,7 +179,7 @@ const Reports = () => {
           if (invoiceSearch && !invoiceNumStr.toLowerCase().includes(invoiceSearch.toLowerCase())) return false;
           if (invoiceStatusFilter !== 'all' && inv.status !== invoiceStatusFilter) return false;
           if (invoiceBrandFilter !== 'all' && inv.brand !== invoiceBrandFilter) return false;
-          if (isAllBills && invoiceDealerFilter !== 'all' && inv.dealerName !== invoiceDealerFilter) return false;
+          if (isAllBillsOrOutstanding && invoiceDealerFilter !== 'all' && inv.dealerName !== invoiceDealerFilter) return false;
           if (invoiceSalesTeamFilter !== 'all' && inv.salesTeam !== invoiceSalesTeamFilter) return false;
           if (invoiceBeltFilter !== 'all' && inv.belt !== invoiceBeltFilter) return false;
           if (invoiceMonthFilter !== 'all' && inv.month !== invoiceMonthFilter) return false;
@@ -197,35 +200,115 @@ const Reports = () => {
         });
 
         // Sorting logic
-        if (invoiceOverdueSort === 'asc') {
-          filteredInvoices.sort((a, b) => {
-            const overdueA = a.status === 'Paid' ? 0 : calculateOverdueDays(a.dateOfInvoice || a.date);
-            const overdueB = b.status === 'Paid' ? 0 : calculateOverdueDays(b.dateOfInvoice || b.date);
-            return overdueA - overdueB;
+        if (isAllBills && (invoiceOverdueSort === 'asc' || invoiceOverdueSort === 'desc')) {
+          // Group invoices by dealerName
+          const groups = {};
+          filteredInvoices.forEach(inv => {
+            const dealer = inv.dealerName || 'Unknown';
+            if (!groups[dealer]) {
+              groups[dealer] = [];
+            }
+            groups[dealer].push(inv);
           });
-        } else if (invoiceOverdueSort === 'desc') {
-          filteredInvoices.sort((a, b) => {
-            const overdueA = a.status === 'Paid' ? 0 : calculateOverdueDays(a.dateOfInvoice || a.date);
-            const overdueB = b.status === 'Paid' ? 0 : calculateOverdueDays(b.dateOfInvoice || b.date);
-            return overdueB - overdueA;
+
+          // Sort invoices within each group
+          Object.keys(groups).forEach(dealer => {
+            groups[dealer].sort((a, b) => {
+              const overdueA = a.status === 'Paid' ? 0 : calculateOverdueDays(a.dateOfInvoice || a.date);
+              const overdueB = b.status === 'Paid' ? 0 : calculateOverdueDays(b.dateOfInvoice || b.date);
+              return invoiceOverdueSort === 'asc' ? overdueA - overdueB : overdueB - overdueA;
+            });
           });
-        } else if (invoiceBalanceSort === 'asc') {
-          filteredInvoices.sort((a, b) => {
-            const balA = a.balance !== undefined ? a.balance : (a.invoiceValue || 0);
-            const balB = b.balance !== undefined ? b.balance : (b.invoiceValue || 0);
-            return balA - balB;
+
+          // Sort the dealer groups based on the highest/lowest overdue days
+          const sortedDealers = Object.keys(groups).sort((a, b) => {
+            const invoicesA = groups[a];
+            const invoicesB = groups[b];
+            
+            const overdueA = invoicesA.map(inv => inv.status === 'Paid' ? 0 : calculateOverdueDays(inv.dateOfInvoice || inv.date));
+            const overdueB = invoicesB.map(inv => inv.status === 'Paid' ? 0 : calculateOverdueDays(inv.dateOfInvoice || inv.date));
+            
+            if (invoiceOverdueSort === 'asc') {
+              const minA = Math.min(...overdueA);
+              const minB = Math.min(...overdueB);
+              return minA - minB;
+            } else {
+              const maxA = Math.max(...overdueA);
+              const maxB = Math.max(...overdueB);
+              return maxB - maxA;
+            }
           });
-        } else if (invoiceBalanceSort === 'desc') {
-          filteredInvoices.sort((a, b) => {
-            const balA = a.balance !== undefined ? a.balance : (a.invoiceValue || 0);
-            const balB = b.balance !== undefined ? b.balance : (b.invoiceValue || 0);
-            return balB - balA;
+
+          // Flatten back into a single array
+          const sortedInvoices = [];
+          sortedDealers.forEach(dealer => {
+            sortedInvoices.push(...groups[dealer]);
           });
+          filteredInvoices = sortedInvoices;
+        } else {
+          // Normal sorting
+          if (invoiceOverdueSort === 'asc') {
+            filteredInvoices.sort((a, b) => {
+              const overdueA = a.status === 'Paid' ? 0 : calculateOverdueDays(a.dateOfInvoice || a.date);
+              const overdueB = b.status === 'Paid' ? 0 : calculateOverdueDays(b.dateOfInvoice || b.date);
+              return overdueA - overdueB;
+            });
+          } else if (invoiceOverdueSort === 'desc') {
+            filteredInvoices.sort((a, b) => {
+              const overdueA = a.status === 'Paid' ? 0 : calculateOverdueDays(a.dateOfInvoice || a.date);
+              const overdueB = b.status === 'Paid' ? 0 : calculateOverdueDays(b.dateOfInvoice || b.date);
+              return overdueB - overdueA;
+            });
+          } else if (invoiceBalanceSort === 'asc') {
+            filteredInvoices.sort((a, b) => {
+              const balA = a.balance !== undefined ? a.balance : (a.invoiceValue || 0);
+              const balB = b.balance !== undefined ? b.balance : (b.invoiceValue || 0);
+              return balA - balB;
+            });
+          } else if (invoiceBalanceSort === 'desc') {
+            filteredInvoices.sort((a, b) => {
+              const balA = a.balance !== undefined ? a.balance : (a.invoiceValue || 0);
+              const balB = b.balance !== undefined ? b.balance : (b.invoiceValue || 0);
+              return balB - balA;
+            });
+          }
         }
+
 
         // Screen sums of all filtered invoices
         const sumInvoicedValue = filteredInvoices.reduce((sum, inv) => sum + (inv.invoiceValue || 0), 0);
         const sumOutstandingBalance = filteredInvoices.reduce((sum, inv) => sum + (inv.balance !== undefined ? inv.balance : inv.invoiceValue), 0);
+
+        // Aggregate by dealer for 'total_outstanding' view
+        const dealerAggregates = {};
+        if (viewMode === 'total_outstanding') {
+          filteredInvoices.forEach(inv => {
+            const dealer = inv.dealerName || 'Unknown';
+            const value = inv.invoiceValue || 0;
+            const balance = inv.balance !== undefined ? inv.balance : value;
+            const brand = inv.brand || 'Unknown';
+
+            if (!dealerAggregates[dealer]) {
+              dealerAggregates[dealer] = {
+                dealerName: dealer,
+                totalInvoiceValue: 0,
+                totalBalance: 0,
+                brandContribution: {}
+              };
+            }
+
+            dealerAggregates[dealer].totalInvoiceValue += value;
+            dealerAggregates[dealer].totalBalance += balance;
+
+            if (balance > 0) {
+              if (!dealerAggregates[dealer].brandContribution[brand]) {
+                dealerAggregates[dealer].brandContribution[brand] = 0;
+              }
+              dealerAggregates[dealer].brandContribution[brand] += balance;
+            }
+          });
+        }
+        const sortedDealerAggregates = Object.values(dealerAggregates).sort((a, b) => b.totalBalance - a.totalBalance);
 
         // Selection logic
         const selectedDealerInvoices = dealerInvoices.filter(inv => selectedInvoices[inv._id]);
@@ -385,6 +468,13 @@ const Reports = () => {
               >
                 📄 View All Bills at Once
               </button>
+              <button
+                onClick={() => { setViewMode('total_outstanding'); setShowMobileFilters(false); }}
+                className={`btn ${viewMode === 'total_outstanding' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ fontWeight: 600, gap: '0.35rem' }}
+              >
+                📊 Total Outstanding
+              </button>
             </div>
 
             {viewMode === 'dealers' && !selectedDealer ? (
@@ -422,10 +512,11 @@ const Reports = () => {
                     display: 'flex',
                     flexWrap: 'wrap',
                     gap: '1rem',
-                    background: '#f8fafc',
-                    padding: '1rem',
-                    borderRadius: '8px',
+                    background: '#ffffff',
+                    padding: '1.25rem',
+                    borderRadius: '12px',
                     border: '1px solid var(--border-color)',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.03)',
                     alignItems: 'center'
                   }}>
                     <div style={{ minWidth: '180px', flex: '1' }}>
@@ -684,10 +775,11 @@ const Reports = () => {
                     display: 'flex',
                     flexWrap: 'wrap',
                     gap: '1rem',
-                    background: '#f8fafc',
-                    padding: '1rem',
-                    borderRadius: '8px',
+                    background: '#ffffff',
+                    padding: '1.25rem',
+                    borderRadius: '12px',
                     border: '1px solid var(--border-color)',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.03)',
                     alignItems: 'center'
                   }}>
                   {isAllBills && (
@@ -908,148 +1000,337 @@ const Reports = () => {
               )}
 
               {/* Screen-Only Table (Interactive, with checkboxes) */}
-              <div className="card screen-only no-print" style={{ padding: '1.25rem', background: 'white' }}>
-                {/* Desktop View Table */}
-                <div className="desktop-view" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                  <table className="responsive-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                    <thead>
-                      <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left' }}>
-                        <th style={{ position: 'sticky', left: 0, background: '#f8fafc', zIndex: 10, padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, borderRight: '2px solid #e2e8f0', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.1)', width: '50px' }}>
-                          <input 
-                            type="checkbox" 
-                            checked={allDealerInvoicesSelected} 
-                            onChange={handleSelectAllToggle}
-                            style={{ cursor: 'pointer', width: '16px', height: '16px' }} 
-                          />
-                        </th>
-                        <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Invoice Number</th>
-                        <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>Invoice Value</th>
-                        <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'center' }}>Overdue Days</th>
-                        <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>Balance</th>
-                        <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Brand</th>
-                        <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Date of Invoice</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredInvoices.length === 0 ? (
-                        <tr>
-                          <td colSpan="7" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
-                            No bills found.
-                          </td>
+              {viewMode === 'total_outstanding' ? (
+                /* Total Outstanding Aggregated View */
+                <div className="card screen-only no-print" style={{ padding: '1.25rem', background: 'white' }}>
+                  {/* Desktop View Table */}
+                  <div className="desktop-view" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                      <thead>
+                        <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left' }}>
+                          <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Dealer Name</th>
+                          <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right', width: '200px' }}>Total Invoice Value</th>
+                          <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right', width: '200px' }}>Total Balance</th>
                         </tr>
-                      ) : (
-                        <>
-                          {filteredInvoices.map((inv, idx) => {
-                            const value = inv.invoiceValue || 0;
-                            const balance = inv.balance !== undefined ? inv.balance : value;
-                            const overdue = calculateOverdueDays(inv.dateOfInvoice || inv.date);
-
+                      </thead>
+                      <tbody>
+                        {sortedDealerAggregates.length === 0 ? (
+                          <tr>
+                            <td colSpan="3" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                              No outstanding dealer aggregates found.
+                            </td>
+                          </tr>
+                        ) : (
+                          sortedDealerAggregates.map((dealer, idx) => {
+                            const isExpanded = expandedDealer === dealer.dealerName;
                             return (
-                              <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                <td style={{ position: 'sticky', left: 0, background: 'white', zIndex: 10, padding: '0.75rem 1rem', borderRight: '2px solid #e2e8f0', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.1)' }}>
+                              <React.Fragment key={idx}>
+                                <tr style={{ borderBottom: '1px solid #f1f5f9', background: isExpanded ? '#f8fafc' : 'transparent' }}>
+                                  <td style={{ padding: '1rem', fontWeight: 600, color: 'var(--primary-color)' }}>{dealer.dealerName}</td>
+                                  <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 500 }}>₹{dealer.totalInvoiceValue.toLocaleString()}</td>
+                                  <td 
+                                    style={{ 
+                                      padding: '1rem', 
+                                      textAlign: 'right', 
+                                      fontWeight: 700, 
+                                      color: '#b91c1c', 
+                                      cursor: 'pointer',
+                                      userSelect: 'none'
+                                    }}
+                                    onClick={() => setExpandedDealer(isExpanded ? null : dealer.dealerName)}
+                                  >
+                                    <span style={{ borderBottom: '1px dashed #b91c1c', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} title="Click to view brand breakdown">
+                                      ₹{dealer.totalBalance.toLocaleString()}
+                                      <span style={{ fontSize: '0.75rem', color: '#b91c1c', opacity: 0.8 }}>
+                                        {isExpanded ? '▲' : '▼'}
+                                      </span>
+                                    </span>
+                                  </td>
+                                </tr>
+                                {isExpanded && (
+                                  <tr>
+                                    <td colSpan="3" style={{ background: '#f8fafc', padding: '1.25rem 2rem', borderBottom: '1px solid #e2e8f0' }}>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                          <h4 style={{ fontSize: '0.85rem', fontWeight: 700, margin: 0, color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                            📊 Brand Outstanding Breakdown for {dealer.dealerName}
+                                          </h4>
+                                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                                            Out of ₹{dealer.totalBalance.toLocaleString()} total
+                                          </span>
+                                        </div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem', marginTop: '0.25rem' }}>
+                                          {Object.entries(dealer.brandContribution).length === 0 ? (
+                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', padding: '0.5rem 0' }}>
+                                              No outstanding balance for any brand.
+                                            </div>
+                                          ) : (
+                                            Object.entries(dealer.brandContribution)
+                                              .sort((a, b) => b[1] - a[1])
+                                              .map(([brand, amt]) => {
+                                                const percentage = dealer.totalBalance > 0 ? ((amt / dealer.totalBalance) * 100).toFixed(1) : 0;
+                                                return (
+                                                  <div key={brand} style={{ background: 'white', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <div>
+                                                      <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--primary-color)' }}>{brand}</span>
+                                                      <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>{percentage}% of total</span>
+                                                    </div>
+                                                    <div style={{ fontWeight: 700, color: '#b91c1c', fontSize: '0.9rem' }}>
+                                                      ₹{amt.toLocaleString()}
+                                                    </div>
+                                                  </div>
+                                                );
+                                              })
+                                          )}
+                                        </div>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </React.Fragment>
+                            );
+                          })
+                        )}
+                        {/* Totals Row */}
+                        {sortedDealerAggregates.length > 0 && (
+                          <tr style={{ fontWeight: 800, background: '#f8fafc', borderTop: '2px solid #cbd5e1' }}>
+                            <td style={{ padding: '1rem' }}>Total</td>
+                            <td style={{ padding: '1rem', textAlign: 'right' }}>₹{sortedDealerAggregates.reduce((sum, d) => sum + d.totalInvoiceValue, 0).toLocaleString()}</td>
+                            <td style={{ padding: '1rem', textAlign: 'right', color: '#b91c1c' }}>₹{sortedDealerAggregates.reduce((sum, d) => sum + d.totalBalance, 0).toLocaleString()}</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile View Card List */}
+                  <div className="mobile-view">
+                    {sortedDealerAggregates.length === 0 ? (
+                      <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                        <div>No outstanding dealer aggregates found.</div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        {sortedDealerAggregates.map((dealer, idx) => {
+                          const isExpanded = expandedDealer === dealer.dealerName;
+                          return (
+                            <div 
+                              key={idx} 
+                              className="mobile-card" 
+                              style={{ 
+                                borderLeft: '4px solid #ef4444',
+                                padding: '1rem',
+                                marginBottom: 0
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary-color)' }}>
+                                  {dealer.dealerName}
+                                </span>
+                                <button
+                                  className="btn btn-secondary"
+                                  style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', margin: 0, height: 'auto', border: '1px solid #cbd5e1' }}
+                                  onClick={() => setExpandedDealer(isExpanded ? null : dealer.dealerName)}
+                                >
+                                  {isExpanded ? 'Hide' : '📊 Breakdown'}
+                                </button>
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem', background: '#f8fafc', padding: '0.5rem', borderRadius: '6px', marginTop: '0.5rem' }}>
+                                <div>
+                                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>TOTAL INVOICED</span>
+                                  <div style={{ fontWeight: 600 }}>₹{dealer.totalInvoiceValue.toLocaleString()}</div>
+                                </div>
+                                <div>
+                                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>TOTAL OUTSTANDING</span>
+                                  <div style={{ fontWeight: 700, color: '#b91c1c' }}>₹{dealer.totalBalance.toLocaleString()}</div>
+                                </div>
+                              </div>
+                              {isExpanded && (
+                                <div style={{ marginTop: '0.75rem', borderTop: '1px dashed #e2e8f0', paddingTop: '0.75rem' }}>
+                                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 600, display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
+                                    Brand Breakdown
+                                  </span>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                    {Object.entries(dealer.brandContribution).length === 0 ? (
+                                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>No outstanding balance.</div>
+                                    ) : (
+                                      Object.entries(dealer.brandContribution)
+                                        .sort((a, b) => b[1] - a[1])
+                                        .map(([brand, amt]) => {
+                                          const percentage = dealer.totalBalance > 0 ? ((amt / dealer.totalBalance) * 100).toFixed(1) : 0;
+                                          return (
+                                            <div key={brand} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', background: 'white', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                                              <span style={{ fontWeight: 600 }}>{brand} <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}>({percentage}%)</span></span>
+                                              <span style={{ fontWeight: 700, color: '#b91c1c' }}>₹{amt.toLocaleString()}</span>
+                                            </div>
+                                          );
+                                        })
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="card screen-only no-print" style={{ padding: '1.25rem', background: 'white' }}>
+                  {/* Desktop View Table */}
+                  <div className="desktop-view" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                    <table className="responsive-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                      <thead>
+                        <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left' }}>
+                          <th style={{ position: 'sticky', left: 0, background: '#f8fafc', zIndex: 10, padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, borderRight: '2px solid #e2e8f0', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.1)', width: '50px' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={allDealerInvoicesSelected} 
+                              onChange={handleSelectAllToggle}
+                              style={{ cursor: 'pointer', width: '16px', height: '16px' }} 
+                            />
+                          </th>
+                          {isAllBills && <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Dealer Name</th>}
+                          <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Invoice Number</th>
+                          <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>Invoice Value</th>
+                          <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'center' }}>Overdue Days</th>
+                          <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>Balance</th>
+                          <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Brand</th>
+                          <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Date of Invoice</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredInvoices.length === 0 ? (
+                          <tr>
+                            <td colSpan={isAllBills ? 8 : 7} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                              No bills found.
+                            </td>
+                          </tr>
+                        ) : (
+                          <>
+                            {filteredInvoices.map((inv, idx) => {
+                              const value = inv.invoiceValue || 0;
+                              const balance = inv.balance !== undefined ? inv.balance : value;
+                              const overdue = calculateOverdueDays(inv.dateOfInvoice || inv.date);
+
+                              return (
+                                <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                  <td style={{ position: 'sticky', left: 0, background: 'white', zIndex: 10, padding: '0.75rem 1rem', borderRight: '2px solid #e2e8f0', boxShadow: '2px 0 5px -2px rgba(0,0,0,0.1)' }}>
+                                    <input 
+                                      type="checkbox" 
+                                      checked={!!selectedInvoices[inv._id]} 
+                                      onChange={() => toggleInvoiceSelection(inv._id)}
+                                      style={{ cursor: 'pointer', width: '16px', height: '16px' }} 
+                                    />
+                                  </td>
+                                  {isAllBills && <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{inv.dealerName}</td>}
+                                  <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{inv.invoiceNumber}</td>
+                                  <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>₹{value.toLocaleString()}</td>
+                                  <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 600, color: overdue > 0 && inv.status !== 'Paid' ? '#b91c1c' : '#64748b' }}>
+                                    {inv.status === 'Paid' ? 0 : overdue}
+                                  </td>
+                                  <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: balance > 0 ? '#b91c1c' : '#15803d' }}>₹{balance.toLocaleString()}</td>
+                                  <td style={{ padding: '0.75rem 1rem' }}>{inv.brand || '-'}</td>
+                                  <td style={{ padding: '0.75rem 1rem' }}>{new Date(inv.dateOfInvoice || inv.date).toLocaleDateString()}</td>
+                                </tr>
+                              );
+                            })}
+                            
+                            {/* Screen Totals Row */}
+                            <tr style={{ background: '#f8fafc', fontWeight: 800, borderTop: '2px solid #e2e8f0' }}>
+                              <td style={{ padding: '0.75rem 1rem' }}>Total</td>
+                              {isAllBills && <td></td>}
+                              <td></td>
+                              <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>₹{sumInvoicedValue.toLocaleString()}</td>
+                              <td></td>
+                              <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: '#b91c1c' }}>₹{sumOutstandingBalance.toLocaleString()}</td>
+                              <td colSpan="2"></td>
+                            </tr>
+                          </>
+                        )}
+
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile View Card List */}
+                  <div className="mobile-view">
+                    {filteredInvoices.length === 0 ? (
+                      <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                        <div>No bills match your filter criteria.</div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        {filteredInvoices.map((inv, idx) => {
+                          const value = inv.invoiceValue || 0;
+                          const balance = inv.balance !== undefined ? inv.balance : value;
+                          const overdue = calculateOverdueDays(inv.dateOfInvoice || inv.date);
+
+                          return (
+                            <div 
+                              key={idx} 
+                              className="mobile-card" 
+                              style={{ 
+                                borderLeft: `4px solid ${inv.status === 'Paid' ? '#10b981' : inv.status === 'Partial' ? '#f59e0b' : '#ef4444'}`,
+                                padding: '1rem',
+                                marginBottom: 0
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                   <input 
                                     type="checkbox" 
                                     checked={!!selectedInvoices[inv._id]} 
                                     onChange={() => toggleInvoiceSelection(inv._id)}
-                                    style={{ cursor: 'pointer', width: '16px', height: '16px' }} 
+                                    style={{ cursor: 'pointer', width: '18px', height: '18px' }} 
                                   />
-                                </td>
-                                <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{inv.invoiceNumber}</td>
-                                <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>₹{value.toLocaleString()}</td>
-                                <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 600, color: overdue > 0 && inv.status !== 'Paid' ? '#b91c1c' : '#64748b' }}>
-                                  {inv.status === 'Paid' ? 0 : overdue}
-                                </td>
-                                <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: balance > 0 ? '#b91c1c' : '#15803d' }}>₹{balance.toLocaleString()}</td>
-                                <td style={{ padding: '0.75rem 1rem' }}>{inv.brand || '-'}</td>
-                                <td style={{ padding: '0.75rem 1rem' }}>{new Date(inv.dateOfInvoice || inv.date).toLocaleDateString()}</td>
-                              </tr>
-                            );
-                          })}
-                          
-                          {/* Screen Totals Row */}
-                          <tr style={{ background: '#f8fafc', fontWeight: 800, borderTop: '2px solid #e2e8f0' }}>
-                            <td style={{ padding: '0.75rem 1rem' }}>Total</td>
-                            <td></td>
-                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>₹{sumInvoicedValue.toLocaleString()}</td>
-                            <td></td>
-                            <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: '#b91c1c' }}>₹{sumOutstandingBalance.toLocaleString()}</td>
-                            <td colSpan="2"></td>
-                          </tr>
-                        </>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Mobile View Card List */}
-                <div className="mobile-view">
-                  {filteredInvoices.length === 0 ? (
-                    <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
-                      <div>No bills match your filter criteria.</div>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                      {filteredInvoices.map((inv, idx) => {
-                        const value = inv.invoiceValue || 0;
-                        const balance = inv.balance !== undefined ? inv.balance : value;
-                        const overdue = calculateOverdueDays(inv.dateOfInvoice || inv.date);
-
-                        return (
-                          <div 
-                            key={idx} 
-                            className="mobile-card" 
-                            style={{ 
-                              borderLeft: `4px solid ${inv.status === 'Paid' ? '#10b981' : inv.status === 'Partial' ? '#f59e0b' : '#ef4444'}`,
-                              padding: '1rem',
-                              marginBottom: 0
-                            }}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <input 
-                                  type="checkbox" 
-                                  checked={!!selectedInvoices[inv._id]} 
-                                  onChange={() => toggleInvoiceSelection(inv._id)}
-                                  style={{ cursor: 'pointer', width: '18px', height: '18px' }} 
-                                />
-                                <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary-color)' }}>
-                                  No: {inv.invoiceNumber}
+                                  <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary-color)' }}>
+                                    No: {inv.invoiceNumber}
+                                  </span>
+                                </div>
+                                <span className={`badge badge-${inv.status === 'Paid' ? 'success' : inv.status === 'Partial' ? 'warning' : 'danger'}`} style={{ fontSize: '0.65rem' }}>
+                                  {inv.status}
                                 </span>
                               </div>
-                              <span className={`badge badge-${inv.status === 'Paid' ? 'success' : inv.status === 'Partial' ? 'warning' : 'danger'}`} style={{ fontSize: '0.65rem' }}>
-                                {inv.status}
-                              </span>
+                              
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem', background: '#f8fafc', padding: '0.5rem', borderRadius: '6px', marginTop: '0.5rem' }}>
+                                <div>
+                                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>VALUE</span>
+                                  <div style={{ fontWeight: 600 }}>₹{value.toLocaleString()}</div>
+                                </div>
+                                <div>
+                                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>BALANCE</span>
+                                  <div style={{ fontWeight: 700, color: balance > 0 ? '#b91c1c' : '#15803d' }}>₹{balance.toLocaleString()}</div>
+                                </div>
+                                <div>
+                                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>OVERDUE</span>
+                                  <div style={{ fontWeight: 600 }}>{inv.status === 'Paid' ? 0 : overdue} Days</div>
+                                </div>
+                                <div>
+                                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>DATE</span>
+                                  <div style={{ fontWeight: 600 }}>{new Date(inv.dateOfInvoice || inv.date).toLocaleDateString()}</div>
+                                </div>
+                                <div style={{ gridColumn: 'span 2' }}>
+                                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>BRAND</span>
+                                  <div style={{ fontWeight: 600 }}>{inv.brand || '-'}</div>
+                                </div>
+                                {isAllBills && (
+                                  <div style={{ gridColumn: 'span 2' }}>
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>DEALER</span>
+                                    <div style={{ fontWeight: 700, color: 'var(--primary-color)' }}>{inv.dealerName}</div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                            
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem', background: '#f8fafc', padding: '0.5rem', borderRadius: '6px', marginTop: '0.5rem' }}>
-                              <div>
-                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>VALUE</span>
-                                <div style={{ fontWeight: 600 }}>₹{value.toLocaleString()}</div>
-                              </div>
-                              <div>
-                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>BALANCE</span>
-                                <div style={{ fontWeight: 700, color: balance > 0 ? '#b91c1c' : '#15803d' }}>₹{balance.toLocaleString()}</div>
-                              </div>
-                              <div>
-                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>OVERDUE</span>
-                                <div style={{ fontWeight: 600 }}>{inv.status === 'Paid' ? 0 : overdue} Days</div>
-                              </div>
-                              <div>
-                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>DATE</span>
-                                <div style={{ fontWeight: 600 }}>{new Date(inv.dateOfInvoice || inv.date).toLocaleDateString()}</div>
-                              </div>
-                              <div style={{ gridColumn: 'span 2' }}>
-                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>BRAND</span>
-                                <div style={{ fontWeight: 600 }}>{inv.brand || '-'}</div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
+
 
               {/* Print-Only Block (Prints ONLY selected bills, formats correctly for A4 portrait/landscape) */}
               <div className="print-only">
@@ -1078,18 +1359,19 @@ const Reports = () => {
                 <table className="print-table">
                   <thead>
                     <tr>
-                      <th style={{ width: '25%', textAlign: 'left' }}>Invoice Number</th>
-                      <th style={{ width: '15%', textAlign: 'right' }}>Invoice Value</th>
-                      <th style={{ width: '12%', textAlign: 'center' }}>Overdue Days</th>
-                      <th style={{ width: '18%', textAlign: 'right' }}>Balance</th>
-                      <th style={{ width: '15%', textAlign: 'left' }}>Brand</th>
-                      <th style={{ width: '15%', textAlign: 'left' }}>Date</th>
+                      {isAllBills && <th style={{ width: '20%', textAlign: 'left' }}>Dealer Name</th>}
+                      <th style={{ width: isAllBills ? '15%' : '25%', textAlign: 'left' }}>Invoice Number</th>
+                      <th style={{ width: isAllBills ? '15%' : '15%', textAlign: 'right' }}>Invoice Value</th>
+                      <th style={{ width: isAllBills ? '10%' : '12%', textAlign: 'center' }}>Overdue Days</th>
+                      <th style={{ width: isAllBills ? '15%' : '18%', textAlign: 'right' }}>Balance</th>
+                      <th style={{ width: isAllBills ? '12%' : '15%', textAlign: 'left' }}>Brand</th>
+                      <th style={{ width: isAllBills ? '13%' : '15%', textAlign: 'left' }}>Date</th>
                     </tr>
                   </thead>
                   <tbody>
                     {printedInvoices.length === 0 ? (
                       <tr>
-                        <td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>
+                        <td colSpan={isAllBills ? 7 : 6} style={{ textAlign: 'center', padding: '2rem' }}>
                           No bills selected to print.
                         </td>
                       </tr>
@@ -1102,6 +1384,7 @@ const Reports = () => {
 
                           return (
                             <tr key={idx}>
+                              {isAllBills && <td>{inv.dealerName}</td>}
                               <td style={{ fontWeight: 600 }}>{inv.invoiceNumber}</td>
                               <td style={{ textAlign: 'right' }}>₹{value.toLocaleString()}</td>
                               <td style={{ textAlign: 'center', fontWeight: 600, color: overdue > 0 && inv.status !== 'Paid' ? '#b91c1c' : 'black' }}>
@@ -1115,6 +1398,7 @@ const Reports = () => {
                         })}
                         <tr style={{ fontWeight: 800, background: '#f8fafc' }}>
                           <td>Total</td>
+                          {isAllBills && <td></td>}
                           <td style={{ textAlign: 'right' }}>₹{printedTotalInvoiced.toLocaleString()}</td>
                           <td></td>
                           <td style={{ textAlign: 'right', color: '#b91c1c' }}>₹{printedTotalOutstanding.toLocaleString()}</td>

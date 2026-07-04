@@ -25,7 +25,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     { to: '/invoice-image', label: 'INVOICE SEARCH', icon: Camera, color: '#06b6d4' },
     { to: '/catalogues', label: 'CATALOGUES', icon: BookOpen, color: '#8b5cf6' },
     { to: '/price-lists', label: 'PRICE LISTS', icon: FileSpreadsheet, color: '#ec4899' },
-    { to: '/credit-debit-notes', label: 'RETURNS & NOTES', icon: FileText, color: '#6d28d9' },
+    { to: '/credit-debit-notes', label: 'CREDIT & DEBIT NOTES', icon: FileText, color: '#6d28d9' },
     { to: '/schemes', label: 'SCHEMES', icon: Award, color: '#f59e0b' },
     { to: '/stock', label: 'STOCK FILES', icon: FileSpreadsheet, color: '#22c55e' },
     { to: '/dealers', label: 'DEALERS MASTER', icon: Users, color: '#0ea5e9' },
@@ -90,7 +90,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
               </NavLink>
               <NavLink to="/credit-debit-notes" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
                 <FileText size={16} />
-                <span>Returns & Notes</span>
+                <span>Credit & Debit Notes</span>
               </NavLink>
               <NavLink to="/schemes" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')} onClick={() => setIsOpen(false)}>
                 <Award size={16} />
