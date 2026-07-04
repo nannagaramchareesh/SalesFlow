@@ -62,13 +62,7 @@ const PriceLists = () => {
       return;
     }
     
-    // Check file size (limit to 10MB)
-    if (selected.size > 10 * 1024 * 1024) {
-      setFileError('File size must be less than 10MB');
-      setFile(null);
-      e.target.value = null;
-      return;
-    }
+    
     
     // Validate file type by extension
     const extension = selected.name.split('.').pop().toLowerCase();

@@ -44,13 +44,7 @@ const Stock = () => {
       return;
     }
     
-    // Check file size (limit to 10MB)
-    if (selected.size > 10 * 1024 * 1024) {
-      setFileError('File size must be less than 10MB');
-      setFile(null);
-      e.target.value = null;
-      return;
-    }
+    
     
     // Validate file type (Excel only)
     const extension = selected.name.split('.').pop().toLowerCase();
@@ -291,7 +285,7 @@ const Stock = () => {
               </div>
 
               <div className="form-group">
-                <label>Choose Excel or CSV File (Max 10MB)</label>
+                <label>Choose Excel or CSV File</label>
                 <div style={{ position: 'relative' }}>
                   <input
                     id="stock-file-input"

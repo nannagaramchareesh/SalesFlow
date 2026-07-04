@@ -1335,24 +1335,30 @@ const CollectionEntry = () => {
                               <div style={{ flex: 1 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary-color)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                                    Invoice No: {inv.invoiceNumber}
-                                    {inv.invoiceImage && (
-                                      <button 
-                                        type="button" 
-                                        onClick={() => setZoomedImageUrl(inv.invoiceImage)}
-                                        style={{ 
-                                          background: 'none', 
-                                          border: 'none', 
-                                          padding: 0, 
-                                          cursor: 'pointer', 
-                                          fontSize: '1rem',
-                                          display: 'inline-flex',
-                                          alignItems: 'center'
-                                        }}
-                                        title="View Hard Copy"
-                                      >
-                                        📷
-                                      </button>
+                                    {isAllBills ? (
+                                      inv.dealerName
+                                    ) : (
+                                      <>
+                                        Invoice No: {inv.invoiceNumber}
+                                        {inv.invoiceImage && (
+                                          <button 
+                                            type="button" 
+                                            onClick={() => setZoomedImageUrl(inv.invoiceImage)}
+                                            style={{ 
+                                              background: 'none', 
+                                              border: 'none', 
+                                              padding: 0, 
+                                              cursor: 'pointer', 
+                                              fontSize: '1rem',
+                                              display: 'inline-flex',
+                                              alignItems: 'center'
+                                            }}
+                                            title="View Hard Copy"
+                                          >
+                                            📷
+                                          </button>
+                                        )}
+                                      </>
                                     )}
                                   </span>
                                   <span className={`badge badge-${inv.status === 'Paid' ? 'success' : inv.status === 'Partial' ? 'warning' : 'danger'}`} style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem' }}>
@@ -1360,7 +1366,32 @@ const CollectionEntry = () => {
                                   </span>
                                 </div>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                                  {isAllBills && <>Dealer: <strong>{inv.dealerName}</strong> | </>}Brand: <strong>{inv.brand || '-'}</strong> | Month: <strong>{inv.month || '-'}</strong> | Sales Team: <strong>{inv.salesTeam || '-'}</strong> | Belt: <strong>{inv.belt || '-'}</strong>
+                                  {isAllBills ? (
+                                    <>
+                                      Invoice No: <strong>{inv.invoiceNumber}</strong>
+                                      {inv.invoiceImage && (
+                                        <button 
+                                          type="button" 
+                                          onClick={() => setZoomedImageUrl(inv.invoiceImage)}
+                                          style={{ 
+                                            background: 'none', 
+                                            border: 'none', 
+                                            padding: '0 0.25rem', 
+                                            cursor: 'pointer', 
+                                            fontSize: '0.9rem',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            verticalAlign: 'middle'
+                                          }}
+                                          title="View Hard Copy"
+                                        >
+                                          📷
+                                        </button>
+                                      )}
+                                      {' '}|{' '}
+                                    </>
+                                  ) : null}
+                                  Brand: <strong>{inv.brand || '-'}</strong> | Month: <strong>{inv.month || '-'}</strong> | Sales Team: <strong>{inv.salesTeam || '-'}</strong> | Belt: <strong>{inv.belt || '-'}</strong>
                                 </div>
                               </div>
                             </div>
