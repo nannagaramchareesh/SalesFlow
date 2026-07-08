@@ -91,7 +91,6 @@ const Stock = () => {
     
     // Convert file to Base64
     const reader = new FileReader();
-    reader.readAsDataURL(file);
     reader.onload = async () => {
       try {
         let fileData = reader.result;
@@ -120,15 +119,17 @@ const Stock = () => {
         await fetchData();
       } catch (error) {
         console.error('Error uploading stock sheet:', error);
-        alert('Failed to upload stock sheet.');
+        alert('Failed to upload stock sheet: ' + (error.response?.data?.message || error.message));
       } finally {
         setUploading(false);
       }
     };
-    reader.onerror = () => {
+    reader.onerror = (error) => {
       setUploading(false);
-      alert('Error reading file.');
+      console.error('FileReader error:', reader.error || error);
+      alert('Error reading file: ' + (reader.error?.message || 'Unknown error'));
     };
+    reader.readAsDataURL(file);
   };
 
   const handleDelete = async (id, stockName) => {

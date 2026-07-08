@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Catalogue = require('../models/Catalogue');
+const { saveFile, getFile, deleteFile } = require('../utils/fileStorage');
 
 // Get all catalogues (excluding large fileData for performance)
 router.get('/', async (req, res) => {
@@ -19,7 +20,9 @@ router.get('/:id', async (req, res) => {
     if (!catalogue) {
       return res.status(404).json({ message: 'Catalogue not found' });
     }
-    res.json(catalogue);
+    const responseData = catalogue.toObject();
+    responseData.fileData = getFile(catalogue.fileData, catalogue.fileType);
+    res.json(responseData);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -27,8 +30,17 @@ router.get('/:id', async (req, res) => {
 
 // Create a new catalogue
 router.post('/', async (req, res) => {
-  const catalogue = new Catalogue(req.body);
   try {
+    const { name, fileName, fileType, fileData } = req.body;
+    const savedPath = saveFile(fileData);
+    
+    const catalogue = new Catalogue({
+      name,
+      fileName,
+      fileType,
+      fileData: savedPath
+    });
+    
     const newCatalogue = await catalogue.save();
     // Return the new catalogue without the fileData to save network bandwidth
     const responseData = newCatalogue.toObject();
@@ -42,10 +54,13 @@ router.post('/', async (req, res) => {
 // Delete a catalogue
 router.delete('/:id', async (req, res) => {
   try {
-    const catalogue = await Catalogue.findByIdAndDelete(req.params.id);
+    const catalogue = await Catalogue.findById(req.params.id);
     if (!catalogue) {
       return res.status(404).json({ message: 'Catalogue not found' });
     }
+    
+    deleteFile(catalogue.fileData);
+    await Catalogue.findByIdAndDelete(req.params.id);
     res.json({ message: 'Catalogue deleted successfully' });
   } catch (err) {
     res.status(500).json({ message: err.message });

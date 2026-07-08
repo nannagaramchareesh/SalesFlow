@@ -97,7 +97,6 @@ const PriceLists = () => {
     
     // Convert file to Base64
     const reader = new FileReader();
-    reader.readAsDataURL(file);
     reader.onload = async () => {
       try {
         let fileData = reader.result;
@@ -126,15 +125,17 @@ const PriceLists = () => {
         await fetchData();
       } catch (error) {
         console.error('Error uploading price list:', error);
-        alert('Failed to upload price list.');
+        alert('Failed to upload price list: ' + (error.response?.data?.message || error.message));
       } finally {
         setUploading(false);
       }
     };
-    reader.onerror = () => {
+    reader.onerror = (error) => {
       setUploading(false);
-      alert('Error reading file.');
+      console.error('FileReader error:', reader.error || error);
+      alert('Error reading file: ' + (reader.error?.message || 'Unknown error'));
     };
+    reader.readAsDataURL(file);
   };
 
   const handleDelete = async (id, priceListName) => {

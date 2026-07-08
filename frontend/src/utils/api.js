@@ -332,6 +332,9 @@ export const createCatalogue = async (data) => {
     const res = await axios.post(`${API_URL}/catalogues`, data);
     return res.data;
   } catch (error) {
+    if (error.response) {
+      throw error;
+    }
     const newCat = {
       ...data,
       _id: Date.now().toString(),
@@ -386,6 +389,9 @@ export const createPriceList = async (data) => {
     const res = await axios.post(`${API_URL}/price-lists`, data);
     return res.data;
   } catch (error) {
+    if (error.response) {
+      throw error;
+    }
     const newPriceList = {
       ...data,
       _id: Date.now().toString(),
@@ -440,6 +446,9 @@ export const createNote = async (data) => {
     const res = await axios.post(`${API_URL}/notes`, data);
     return res.data;
   } catch (error) {
+    if (error.response) {
+      throw error;
+    }
     const newNote = {
       ...data,
       _id: Date.now().toString(),
@@ -494,6 +503,9 @@ export const createScheme = async (data) => {
     const res = await axios.post(`${API_URL}/schemes`, data);
     return res.data;
   } catch (error) {
+    if (error.response) {
+      throw error;
+    }
     const newScheme = {
       ...data,
       _id: Date.now().toString(),
@@ -548,6 +560,9 @@ export const createStock = async (data) => {
     const res = await axios.post(`${API_URL}/stocks`, data);
     return res.data;
   } catch (error) {
+    if (error.response) {
+      throw error;
+    }
     const newStock = {
       ...data,
       _id: Date.now().toString(),

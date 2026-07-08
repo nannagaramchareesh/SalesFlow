@@ -96,7 +96,6 @@ const Catalogues = () => {
     setUploading(true);
     
     const reader = new FileReader();
-    reader.readAsDataURL(file);
     reader.onload = async () => {
       try {
         let fileData = reader.result;
@@ -123,15 +122,17 @@ const Catalogues = () => {
         await fetchData();
       } catch (error) {
         console.error('Error uploading:', error);
-        alert('Failed to upload.');
+        alert('Failed to upload: ' + (error.response?.data?.message || error.message));
       } finally {
         setUploading(false);
       }
     };
-    reader.onerror = () => {
+    reader.onerror = (error) => {
       setUploading(false);
-      alert('Error reading file.');
+      console.error('FileReader error:', reader.error || error);
+      alert('Error reading file: ' + (reader.error?.message || 'Unknown error'));
     };
+    reader.readAsDataURL(file);
   };
 
   const handleDelete = async (id, catalogName) => {

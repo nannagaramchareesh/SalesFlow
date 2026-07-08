@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Note = require('../models/Note');
+const { saveFile, getFile, deleteFile } = require('../utils/fileStorage');
 
 // Get all notes (excluding large fileData for performance)
 router.get('/', async (req, res) => {
@@ -19,7 +20,9 @@ router.get('/:id', async (req, res) => {
     if (!note) {
       return res.status(404).json({ message: 'Note not found' });
     }
-    res.json(note);
+    const responseData = note.toObject();
+    responseData.fileData = getFile(note.fileData, note.fileType);
+    res.json(responseData);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -27,8 +30,17 @@ router.get('/:id', async (req, res) => {
 
 // Create a new note
 router.post('/', async (req, res) => {
-  const note = new Note(req.body);
   try {
+    const { name, fileName, fileType, fileData } = req.body;
+    const savedPath = saveFile(fileData);
+    
+    const note = new Note({
+      name,
+      fileName,
+      fileType,
+      fileData: savedPath
+    });
+    
     const newNote = await note.save();
     // Return the new note without the fileData to save network bandwidth
     const responseData = newNote.toObject();
@@ -42,10 +54,13 @@ router.post('/', async (req, res) => {
 // Delete a note
 router.delete('/:id', async (req, res) => {
   try {
-    const note = await Note.findByIdAndDelete(req.params.id);
+    const note = await Note.findById(req.params.id);
     if (!note) {
       return res.status(404).json({ message: 'Note not found' });
     }
+    
+    deleteFile(note.fileData);
+    await Note.findByIdAndDelete(req.params.id);
     res.json({ message: 'Note deleted successfully' });
   } catch (err) {
     res.status(500).json({ message: err.message });

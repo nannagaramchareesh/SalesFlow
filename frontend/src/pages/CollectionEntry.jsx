@@ -110,7 +110,6 @@ const CollectionEntry = () => {
   const compressImage = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.readAsDataURL(file);
       reader.onload = (event) => {
         const img = new Image();
         img.src = event.target.result;
@@ -118,10 +117,10 @@ const CollectionEntry = () => {
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
-
+ 
           const MAX_WIDTH = 1000;
           const MAX_HEIGHT = 1000;
-
+ 
           if (width > height) {
             if (width > MAX_WIDTH) {
               height *= MAX_WIDTH / width;
@@ -133,19 +132,20 @@ const CollectionEntry = () => {
               height = MAX_HEIGHT;
             }
           }
-
+ 
           canvas.width = width;
           canvas.height = height;
-
+ 
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
-
+ 
           const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
           resolve(compressedDataUrl);
         };
         img.onerror = (err) => reject(err);
       };
       reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
     });
   };
 

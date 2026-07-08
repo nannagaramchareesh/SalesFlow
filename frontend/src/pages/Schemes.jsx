@@ -99,7 +99,6 @@ const Schemes = () => {
     
     // Convert file to Base64
     const reader = new FileReader();
-    reader.readAsDataURL(file);
     reader.onload = async () => {
       try {
         let fileData = reader.result;
@@ -128,15 +127,17 @@ const Schemes = () => {
         await fetchData();
       } catch (error) {
         console.error('Error uploading scheme:', error);
-        alert('Failed to upload scheme.');
+        alert('Failed to upload scheme: ' + (error.response?.data?.message || error.message));
       } finally {
         setUploading(false);
       }
     };
-    reader.onerror = () => {
+    reader.onerror = (error) => {
       setUploading(false);
-      alert('Error reading file.');
+      console.error('FileReader error:', reader.error || error);
+      alert('Error reading file: ' + (reader.error?.message || 'Unknown error'));
     };
+    reader.readAsDataURL(file);
   };
 
   const handleDelete = async (id, schemeName) => {

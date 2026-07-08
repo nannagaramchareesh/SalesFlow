@@ -99,7 +99,6 @@ const CreditDebitNotes = () => {
     
     // Convert file to Base64
     const reader = new FileReader();
-    reader.readAsDataURL(file);
     reader.onload = async () => {
       try {
         let fileData = reader.result;
@@ -128,15 +127,17 @@ const CreditDebitNotes = () => {
         await fetchData();
       } catch (error) {
         console.error('Error uploading note:', error);
-        alert('Failed to upload note.');
+        alert('Failed to upload note: ' + (error.response?.data?.message || error.message));
       } finally {
         setUploading(false);
       }
     };
-    reader.onerror = () => {
+    reader.onerror = (error) => {
       setUploading(false);
-      alert('Error reading file.');
+      console.error('FileReader error:', reader.error || error);
+      alert('Error reading file: ' + (reader.error?.message || 'Unknown error'));
     };
+    reader.readAsDataURL(file);
   };
 
   const handleDelete = async (id, noteName) => {
