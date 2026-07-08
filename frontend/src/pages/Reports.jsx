@@ -555,6 +555,57 @@ const Reports = () => {
             margin-top: 0.5rem !important;
           }
         }
+
+        /* Checkbox column responsive styles */
+        .checkbox-col-th, .checkbox-col-td {
+          position: sticky !important;
+          left: 0 !important;
+          z-index: 10 !important;
+          padding: 0 !important;
+          border-right: 2px solid #e2e8f0 !important;
+          box-shadow: 2px 0 5px -2px rgba(0,0,0,0.1) !important;
+          width: 36px !important;
+          max-width: 36px !important;
+          min-width: 36px !important;
+          vertical-align: middle !important;
+          box-sizing: border-box !important;
+        }
+
+        .checkbox-col-th {
+          background: #f8fafc !important;
+        }
+
+        .checkbox-col-td {
+          background: white !important;
+        }
+
+        .checkbox-label-wrapper {
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          width: 100% !important;
+          height: 100% !important;
+          min-height: 36px !important;
+          padding: 0.25rem !important;
+          cursor: pointer !important;
+          margin: 0 !important;
+          box-sizing: border-box !important;
+        }
+
+        @media (max-width: 768px) {
+          .checkbox-col-th, .checkbox-col-td {
+            position: static !important;
+            box-shadow: none !important;
+            border-right: 1px solid #cbd5e1 !important;
+            width: 30px !important;
+            max-width: 30px !important;
+            min-width: 30px !important;
+          }
+          .checkbox-label-wrapper {
+            min-height: 30px !important;
+            padding: 0.1rem !important;
+          }
+        }
       `}</style>
 
       <>
@@ -1580,36 +1631,13 @@ const Reports = () => {
                     <table className="responsive-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                       <thead>
                         <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left' }}>
-                          <th 
-                            style={{ 
-                              position: 'sticky', 
-                              left: 0, 
-                              background: '#f8fafc', 
-                              zIndex: 10, 
-                              padding: 0, 
-                              borderRight: '2px solid #e2e8f0', 
-                              boxShadow: '2px 0 5px -2px rgba(0,0,0,0.1)', 
-                              width: '50px',
-                              verticalAlign: 'middle'
-                            }}
-                          >
-                            <label style={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              justifyContent: 'center', 
-                              width: '100%', 
-                              height: '100%', 
-                              minHeight: '44px',
-                              padding: '0.75rem 1rem', 
-                              cursor: 'pointer',
-                              margin: 0,
-                              boxSizing: 'border-box'
-                            }}>
+                          <th className="checkbox-col-th">
+                            <label className="checkbox-label-wrapper">
                               <input 
                                 type="checkbox" 
                                 checked={allDealerInvoicesSelected} 
                                 onChange={handleSelectAllToggle}
-                                style={{ cursor: 'pointer', width: '18px', height: '18px', margin: 0 }} 
+                                style={{ cursor: 'pointer', width: '16px', height: '16px', margin: 0 }} 
                               />
                             </label>
                           </th>
@@ -1638,35 +1666,13 @@ const Reports = () => {
 
                               return (
                                 <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                  <td 
-                                    style={{ 
-                                      position: 'sticky', 
-                                      left: 0, 
-                                      background: 'white', 
-                                      zIndex: 10, 
-                                      padding: 0, 
-                                      borderRight: '2px solid #e2e8f0', 
-                                      boxShadow: '2px 0 5px -2px rgba(0,0,0,0.1)',
-                                      verticalAlign: 'middle'
-                                    }}
-                                  >
-                                    <label style={{ 
-                                      display: 'flex', 
-                                      alignItems: 'center', 
-                                      justifyContent: 'center', 
-                                      width: '100%', 
-                                      height: '100%', 
-                                      minHeight: '44px',
-                                      padding: '0.75rem 1rem', 
-                                      cursor: 'pointer',
-                                      margin: 0,
-                                      boxSizing: 'border-box'
-                                    }}>
+                                  <td className="checkbox-col-td">
+                                    <label className="checkbox-label-wrapper">
                                       <input 
                                         type="checkbox" 
                                         checked={!!selectedInvoices[inv._id]} 
                                         onChange={() => toggleInvoiceSelection(inv._id)}
-                                        style={{ cursor: 'pointer', width: '18px', height: '18px', margin: 0 }} 
+                                        style={{ cursor: 'pointer', width: '16px', height: '16px', margin: 0 }} 
                                       />
                                     </label>
                                   </td>
@@ -1685,9 +1691,15 @@ const Reports = () => {
                             
                             {/* Screen Totals Row */}
                             <tr style={{ background: '#f8fafc', fontWeight: 800, borderTop: '2px solid #e2e8f0' }}>
-                              <td style={{ padding: '0.75rem 1rem' }}>Total</td>
-                              {isAllBills && <td></td>}
                               <td></td>
+                              {isAllBills ? (
+                                <>
+                                  <td style={{ padding: '0.75rem 1rem' }}>Total</td>
+                                  <td></td>
+                                </>
+                              ) : (
+                                <td style={{ padding: '0.75rem 1rem' }}>Total</td>
+                              )}
                               <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>₹{sumInvoicedValue.toLocaleString()}</td>
                               <td></td>
                               <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: '#b91c1c' }}>₹{sumOutstandingBalance.toLocaleString()}</td>
