@@ -1,11 +1,23 @@
 const fs = require('fs');
 const path = require('path');
 
-const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
+let UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
 
 // Ensure directory exists
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+try {
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+} catch (err) {
+  console.warn("Unable to create uploads directory on read-only filesystem. Falling back to /tmp/uploads.", err);
+  UPLOADS_DIR = path.join('/tmp', 'uploads');
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    try {
+      fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    } catch (tmpErr) {
+      console.error("Failed to create /tmp/uploads directory:", tmpErr);
+    }
+  }
 }
 
 /**
