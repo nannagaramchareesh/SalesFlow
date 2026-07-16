@@ -4,6 +4,140 @@ import html2canvas from 'html2canvas';
 import { getInvoices } from '../utils/api';
 import { calculateOverdueDays, calculateDealerTotalOutstanding, countOverdueBills } from '../utils/formulas';
 
+const BrandMultiSelect = ({ selectedBrands, setSelectedBrands, uniqueBrands }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const handleToggle = (brand) => {
+    setSelectedBrands(prev => {
+      if (prev.includes(brand)) {
+        return prev.filter(b => b !== brand);
+      } else {
+        return [...prev, brand];
+      }
+    });
+  };
+
+  const handleSelectAll = () => {
+    setSelectedBrands(uniqueBrands);
+  };
+
+  const handleClearAll = () => {
+    setSelectedBrands([]);
+  };
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          padding: '0.45rem 0.75rem',
+          fontSize: '0.85rem',
+          width: '100%',
+          borderRadius: '6px',
+          border: '1px solid var(--border-color)',
+          background: 'white',
+          textAlign: 'left',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          cursor: 'pointer',
+          minHeight: '34px'
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '85%' }}>
+          {selectedBrands.length === 0 
+            ? 'All Brands' 
+            : selectedBrands.length === uniqueBrands.length 
+              ? 'All Brands Selected' 
+              : selectedBrands.join(', ')}
+        </span>
+        <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>{isOpen ? '▲' : '▼'}</span>
+      </button>
+      
+      {isOpen && (
+        <>
+          <div 
+            onClick={() => setIsOpen(false)} 
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 998,
+              background: 'transparent'
+            }}
+          />
+          
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            marginTop: '4px',
+            background: 'white',
+            border: '1px solid var(--border-color)',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+            zIndex: 999,
+            maxHeight: '200px',
+            overflowY: 'auto',
+            padding: '0.5rem'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.25rem', marginBottom: '0.25rem' }}>
+              <button 
+                type="button" 
+                onClick={handleSelectAll} 
+                style={{ background: 'none', border: 'none', color: 'var(--primary-color)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', padding: '0.2rem' }}
+              >
+                Select All
+              </button>
+              <button 
+                type="button" 
+                onClick={handleClearAll} 
+                style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', padding: '0.2rem' }}
+              >
+                Clear
+              </button>
+            </div>
+            
+            {uniqueBrands.map(brand => {
+              const isChecked = selectedBrands.includes(brand);
+              return (
+                <label 
+                  key={brand} 
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.35rem 0.5rem',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    borderRadius: '4px',
+                    background: isChecked ? '#f8fafc' : 'transparent',
+                    userSelect: 'none'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+                  onMouseLeave={e => e.currentTarget.style.background = isChecked ? '#f8fafc' : 'transparent'}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => handleToggle(brand)}
+                    style={{ cursor: 'pointer', width: '14px', height: '14px', margin: 0 }}
+                  />
+                  <span style={{ color: 'var(--text-primary)' }}>{brand}</span>
+                </label>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 const Reports = () => {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,7 +157,7 @@ const Reports = () => {
   const [invoiceSearch, setInvoiceSearch] = useState('');
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState('all'); // all, Unpaid, Partial, Paid
   const [invoiceOverdueFilter, setInvoiceOverdueFilter] = useState('all'); // all, overdue, overdue_30, overdue_60, overdue_90, not_overdue
-  const [invoiceBrandFilter, setInvoiceBrandFilter] = useState('all'); // all, or specific brand
+  const [invoiceBrandFilter, setInvoiceBrandFilter] = useState([]); // Array of selected brands
   const [invoiceDealerFilter, setInvoiceDealerFilter] = useState('all'); // all, or specific dealer
   const [invoiceSalesTeamFilter, setInvoiceSalesTeamFilter] = useState('all'); // all, or specific sales team
   const [invoiceBeltFilter, setInvoiceBeltFilter] = useState('all'); // all, or specific belt
@@ -31,6 +165,9 @@ const Reports = () => {
   const [invoiceBalanceStatusFilter, setInvoiceBalanceStatusFilter] = useState('all'); // all, outstanding, zero
   const [invoiceOverdueSort, setInvoiceOverdueSort] = useState('none'); // none, asc, desc
   const [invoiceBalanceSort, setInvoiceBalanceSort] = useState('none'); // none, asc, desc
+  const [invoiceValueMin, setInvoiceValueMin] = useState('');
+  const [invoiceValueMax, setInvoiceValueMax] = useState('');
+  const [invoiceValueTypeFilter, setInvoiceValueTypeFilter] = useState('with_tax');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -88,18 +225,21 @@ const Reports = () => {
       (invoiceMonthFilter !== 'all' ? 1 : 0) +
       (invoiceBalanceStatusFilter !== 'all' ? 1 : 0) +
       (invoiceOverdueFilter !== 'all' ? 1 : 0) +
-      (invoiceBrandFilter !== 'all' ? 1 : 0) +
+      (invoiceBrandFilter.length > 0 ? 1 : 0) +
       (isAllBills && invoiceDealerFilter !== 'all' ? 1 : 0) +
       (invoiceOverdueSort !== 'none' ? 1 : 0) +
-      (invoiceBalanceSort !== 'none' ? 1 : 0);
-  }, [invoiceStatusFilter, invoiceSalesTeamFilter, invoiceBeltFilter, invoiceMonthFilter, invoiceBalanceStatusFilter, invoiceOverdueFilter, invoiceBrandFilter, isAllBills, invoiceDealerFilter, invoiceOverdueSort, invoiceBalanceSort]);
+      (invoiceBalanceSort !== 'none' ? 1 : 0) +
+      (invoiceValueMin !== '' ? 1 : 0) +
+      (invoiceValueMax !== '' ? 1 : 0) +
+      (invoiceValueTypeFilter !== 'with_tax' ? 1 : 0);
+  }, [invoiceStatusFilter, invoiceSalesTeamFilter, invoiceBeltFilter, invoiceMonthFilter, invoiceBalanceStatusFilter, invoiceOverdueFilter, invoiceBrandFilter, isAllBills, invoiceDealerFilter, invoiceOverdueSort, invoiceBalanceSort, invoiceValueMin, invoiceValueMax, invoiceValueTypeFilter]);
 
   const filteredInvoices = useMemo(() => {
     let filtered = dealerInvoices.filter(inv => {
       const invoiceNumStr = inv.invoiceNumber ? String(inv.invoiceNumber) : '';
       if (invoiceSearch && !invoiceNumStr.toLowerCase().includes(invoiceSearch.toLowerCase())) return false;
       if (invoiceStatusFilter !== 'all' && inv.status !== invoiceStatusFilter) return false;
-      if (invoiceBrandFilter !== 'all' && inv.brand !== invoiceBrandFilter) return false;
+      if (invoiceBrandFilter.length > 0 && !invoiceBrandFilter.includes(inv.brand)) return false;
       if (isAllBillsOrOutstanding && invoiceDealerFilter !== 'all' && inv.dealerName !== invoiceDealerFilter) return false;
       if (invoiceSalesTeamFilter !== 'all' && inv.salesTeam !== invoiceSalesTeamFilter) return false;
       if (invoiceBeltFilter !== 'all' && inv.belt !== invoiceBeltFilter) return false;
@@ -116,6 +256,11 @@ const Reports = () => {
       if (invoiceOverdueFilter === 'overdue_60' && (overdueDays <= 60 || inv.status === 'Paid')) return false;
       if (invoiceOverdueFilter === 'overdue_90' && (overdueDays <= 90 || inv.status === 'Paid')) return false;
       if (invoiceOverdueFilter === 'not_overdue' && (overdueDays > 0 && inv.status !== 'Paid')) return false;
+
+      // Apply Invoice Value min/max filter based on selected type
+      const amt = invoiceValueTypeFilter === 'before_tax' ? (inv.invoiceValueBeforeTax || 0) : (inv.invoiceValue || 0);
+      if (invoiceValueMin !== '' && amt < Number(invoiceValueMin)) return false;
+      if (invoiceValueMax !== '' && amt > Number(invoiceValueMax)) return false;
 
       return true;
     });
@@ -190,7 +335,7 @@ const Reports = () => {
       }
     }
     return filtered;
-  }, [dealerInvoices, invoiceSearch, invoiceStatusFilter, invoiceBrandFilter, isAllBillsOrOutstanding, invoiceDealerFilter, invoiceSalesTeamFilter, invoiceBeltFilter, invoiceMonthFilter, invoiceBalanceStatusFilter, invoiceOverdueFilter, isAllBills, invoiceOverdueSort, invoiceBalanceSort]);
+  }, [dealerInvoices, invoiceSearch, invoiceStatusFilter, invoiceBrandFilter, isAllBillsOrOutstanding, invoiceDealerFilter, invoiceSalesTeamFilter, invoiceBeltFilter, invoiceMonthFilter, invoiceBalanceStatusFilter, invoiceOverdueFilter, isAllBills, invoiceOverdueSort, invoiceBalanceSort, invoiceValueMin, invoiceValueMax, invoiceValueTypeFilter]);
 
   const sumInvoicedValue = useMemo(() => {
     return filteredInvoices.reduce((sum, inv) => sum + (inv.invoiceValue || 0), 0);
@@ -198,6 +343,10 @@ const Reports = () => {
 
   const sumOutstandingBalance = useMemo(() => {
     return filteredInvoices.reduce((sum, inv) => sum + (inv.balance !== undefined ? inv.balance : inv.invoiceValue), 0);
+  }, [filteredInvoices]);
+
+  const sumBeforeTaxValue = useMemo(() => {
+    return filteredInvoices.reduce((sum, inv) => sum + (inv.invoiceValueBeforeTax || 0), 0);
   }, [filteredInvoices]);
 
   const sortedDealerAggregates = useMemo(() => {
@@ -256,6 +405,10 @@ const Reports = () => {
 
   const printedTotalOutstanding = useMemo(() => {
     return printedInvoices.reduce((sum, inv) => sum + (inv.balance !== undefined ? inv.balance : inv.invoiceValue), 0);
+  }, [printedInvoices]);
+
+  const printedTotalBeforeTax = useMemo(() => {
+    return printedInvoices.reduce((sum, inv) => sum + (inv.invoiceValueBeforeTax || 0), 0);
   }, [printedInvoices]);
 
   const handleSelectAllToggle = () => {
@@ -960,7 +1113,7 @@ const Reports = () => {
                           setInvoiceSearch('');
                           setInvoiceStatusFilter('all');
                           setInvoiceOverdueFilter('all');
-                          setInvoiceBrandFilter('all');
+                          setInvoiceBrandFilter([]);
                           setInvoiceDealerFilter('all');
                           setInvoiceSalesTeamFilter('all');
                           setInvoiceBeltFilter('all');
@@ -968,6 +1121,9 @@ const Reports = () => {
                           setInvoiceBalanceStatusFilter('all');
                           setInvoiceOverdueSort('none');
                           setInvoiceBalanceSort('none');
+                          setInvoiceValueMin('');
+                          setInvoiceValueMax('');
+                          setInvoiceValueTypeFilter('with_tax');
                         }}
                         style={{ margin: 0, width: 'auto', whiteSpace: 'nowrap', fontSize: '0.8rem', color: '#b91c1c', border: '1px solid #fee2e2', background: '#fff5f5', height: '38px' }}
                       >
@@ -1016,10 +1172,28 @@ const Reports = () => {
                           <span style={{ cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem', color: '#64748b' }} onClick={() => setInvoiceOverdueFilter('all')}>×</span>
                         </span>
                       )}
-                      {invoiceBrandFilter !== 'all' && (
+                      {invoiceBrandFilter.length > 0 && invoiceBrandFilter.map(brand => (
+                        <span key={brand} className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.7rem', padding: '0.25rem 0.6rem', background: '#e2e8f0', color: '#334155', borderRadius: '20px', fontWeight: 600 }}>
+                          Brand: {brand}
+                          <span style={{ cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem', color: '#64748b' }} onClick={() => setInvoiceBrandFilter(prev => prev.filter(b => b !== brand))}>×</span>
+                        </span>
+                      ))}
+                      {invoiceValueTypeFilter !== 'with_tax' && (
                         <span className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.7rem', padding: '0.25rem 0.6rem', background: '#e2e8f0', color: '#334155', borderRadius: '20px', fontWeight: 600 }}>
-                          Brand: {invoiceBrandFilter}
-                          <span style={{ cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem', color: '#64748b' }} onClick={() => setInvoiceBrandFilter('all')}>×</span>
+                          Value Type: Before Tax
+                          <span style={{ cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem', color: '#64748b' }} onClick={() => setInvoiceValueTypeFilter('with_tax')}>×</span>
+                        </span>
+                      )}
+                      {invoiceValueMin !== '' && (
+                        <span className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.7rem', padding: '0.25rem 0.6rem', background: '#e2e8f0', color: '#334155', borderRadius: '20px', fontWeight: 600 }}>
+                          Min Value: ₹{Number(invoiceValueMin).toLocaleString()}
+                          <span style={{ cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem', color: '#64748b' }} onClick={() => setInvoiceValueMin('')}>×</span>
+                        </span>
+                      )}
+                      {invoiceValueMax !== '' && (
+                        <span className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.7rem', padding: '0.25rem 0.6rem', background: '#e2e8f0', color: '#334155', borderRadius: '20px', fontWeight: 600 }}>
+                          Max Value: ₹{Number(invoiceValueMax).toLocaleString()}
+                          <span style={{ cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem', color: '#64748b' }} onClick={() => setInvoiceValueMax('')}>×</span>
                         </span>
                       )}
                       {isAllBills && invoiceDealerFilter !== 'all' && (
@@ -1164,17 +1338,41 @@ const Reports = () => {
                       </div>
                       <div>
                         <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Brand</label>
+                        <BrandMultiSelect selectedBrands={invoiceBrandFilter} setSelectedBrands={setInvoiceBrandFilter} uniqueBrands={uniqueBrands} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Invoice Value Type</label>
                         <select
                           className="form-input"
                           style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
-                          value={invoiceBrandFilter}
-                          onChange={e => setInvoiceBrandFilter(e.target.value)}
+                          value={invoiceValueTypeFilter}
+                          onChange={e => setInvoiceValueTypeFilter(e.target.value)}
                         >
-                          <option value="all">All Brands</option>
-                          {uniqueBrands.map(brand => (
-                            <option key={brand} value={brand}>{brand}</option>
-                          ))}
+                          <option value="with_tax">Invoice Value with Tax</option>
+                          <option value="before_tax">Invoice Value Before Tax</option>
                         </select>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Invoice Value Range</label>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <input
+                            type="number"
+                            placeholder="Min"
+                            className="form-input"
+                            style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                            value={invoiceValueMin}
+                            onChange={e => setInvoiceValueMin(e.target.value)}
+                          />
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>to</span>
+                          <input
+                            type="number"
+                            placeholder="Max"
+                            className="form-input"
+                            style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                            value={invoiceValueMax}
+                            onChange={e => setInvoiceValueMax(e.target.value)}
+                          />
+                        </div>
                       </div>
                       <div>
                         <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Sort Overdue</label>
@@ -1220,7 +1418,7 @@ const Reports = () => {
                                 setInvoiceSearch('');
                                 setInvoiceStatusFilter('all');
                                 setInvoiceOverdueFilter('all');
-                                setInvoiceBrandFilter('all');
+                                setInvoiceBrandFilter([]);
                                 setInvoiceDealerFilter('all');
                                 setInvoiceSalesTeamFilter('all');
                                 setInvoiceBeltFilter('all');
@@ -1228,6 +1426,9 @@ const Reports = () => {
                                 setInvoiceBalanceStatusFilter('all');
                                 setInvoiceOverdueSort('none');
                                 setInvoiceBalanceSort('none');
+                                setInvoiceValueMin('');
+                                setInvoiceValueMax('');
+                                setInvoiceValueTypeFilter('with_tax');
                                 setShowMobileFilters(false);
                               }}
                             >
@@ -1351,17 +1552,41 @@ const Reports = () => {
                       </div>
                       <div>
                         <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Brand</label>
+                        <BrandMultiSelect selectedBrands={invoiceBrandFilter} setSelectedBrands={setInvoiceBrandFilter} uniqueBrands={uniqueBrands} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Invoice Value Type</label>
                         <select
                           className="form-input"
                           style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
-                          value={invoiceBrandFilter}
-                          onChange={e => setInvoiceBrandFilter(e.target.value)}
+                          value={invoiceValueTypeFilter}
+                          onChange={e => setInvoiceValueTypeFilter(e.target.value)}
                         >
-                          <option value="all">All Brands</option>
-                          {uniqueBrands.map(brand => (
-                            <option key={brand} value={brand}>{brand}</option>
-                          ))}
+                          <option value="with_tax">Invoice Value with Tax</option>
+                          <option value="before_tax">Invoice Value Before Tax</option>
                         </select>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Invoice Value Range</label>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <input
+                            type="number"
+                            placeholder="Min"
+                            className="form-input"
+                            style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                            value={invoiceValueMin}
+                            onChange={e => setInvoiceValueMin(e.target.value)}
+                          />
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>to</span>
+                          <input
+                            type="number"
+                            placeholder="Max"
+                            className="form-input"
+                            style={{ padding: '0.45rem', fontSize: '0.85rem', width: '100%', borderRadius: '6px' }}
+                            value={invoiceValueMax}
+                            onChange={e => setInvoiceValueMax(e.target.value)}
+                          />
+                        </div>
                       </div>
                       <div>
                         <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>Sort Overdue</label>
@@ -1648,6 +1873,7 @@ const Reports = () => {
                           <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>Balance</th>
                           <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Brand</th>
                           <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Date of Invoice</th>
+                          {isAllBills && <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>Before Tax Invoice Value</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -1685,6 +1911,7 @@ const Reports = () => {
                                   <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: balance > 0 ? '#b91c1c' : '#15803d' }}>₹{balance.toLocaleString()}</td>
                                   <td style={{ padding: '0.75rem 1rem' }}>{inv.brand || '-'}</td>
                                   <td style={{ padding: '0.75rem 1rem' }}>{new Date(inv.dateOfInvoice || inv.date).toLocaleDateString()}</td>
+                                  {isAllBills && <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>₹{(inv.invoiceValueBeforeTax || 0).toLocaleString()}</td>}
                                 </tr>
                               );
                             })}
@@ -1696,14 +1923,21 @@ const Reports = () => {
                                 <>
                                   <td style={{ padding: '0.75rem 1rem' }}>Total</td>
                                   <td></td>
+                                  <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>₹{sumInvoicedValue.toLocaleString()}</td>
+                                  <td></td>
+                                  <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: '#b91c1c' }}>₹{sumOutstandingBalance.toLocaleString()}</td>
+                                  <td colSpan="2"></td>
+                                  <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>₹{sumBeforeTaxValue.toLocaleString()}</td>
                                 </>
                               ) : (
-                                <td style={{ padding: '0.75rem 1rem' }}>Total</td>
+                                <>
+                                  <td style={{ padding: '0.75rem 1rem' }}>Total</td>
+                                  <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>₹{sumInvoicedValue.toLocaleString()}</td>
+                                  <td></td>
+                                  <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: '#b91c1c' }}>₹{sumOutstandingBalance.toLocaleString()}</td>
+                                  <td colSpan="2"></td>
+                                </>
                               )}
-                              <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>₹{sumInvoicedValue.toLocaleString()}</td>
-                              <td></td>
-                              <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: '#b91c1c' }}>₹{sumOutstandingBalance.toLocaleString()}</td>
-                              <td colSpan="2"></td>
                             </tr>
                           </>
                         )}
@@ -1808,13 +2042,14 @@ const Reports = () => {
                     <table className="print-table">
                       <thead>
                         <tr>
-                          {isAllBills && <th style={{ width: '20%', textAlign: 'left' }}>Dealer Name</th>}
-                          <th style={{ width: isAllBills ? '15%' : '25%', textAlign: 'left' }}>Invoice Number</th>
-                          <th style={{ width: isAllBills ? '15%' : '15%', textAlign: 'right' }}>Invoice Value</th>
-                          <th style={{ width: isAllBills ? '10%' : '12%', textAlign: 'center' }}>Overdue Days</th>
-                          <th style={{ width: isAllBills ? '15%' : '18%', textAlign: 'right' }}>Balance</th>
-                          <th style={{ width: isAllBills ? '12%' : '15%', textAlign: 'left' }}>Brand</th>
-                          <th style={{ width: isAllBills ? '13%' : '15%', textAlign: 'left' }}>Date</th>
+                          {isAllBills && <th style={{ width: '18%', textAlign: 'left' }}>Dealer Name</th>}
+                          <th style={{ width: isAllBills ? '12%' : '25%', textAlign: 'left' }}>Invoice Number</th>
+                          <th style={{ width: isAllBills ? '12%' : '15%', textAlign: 'right' }}>Invoice Value</th>
+                          <th style={{ width: isAllBills ? '9%' : '12%', textAlign: 'center' }}>Overdue Days</th>
+                          <th style={{ width: isAllBills ? '12%' : '18%', textAlign: 'right' }}>Balance</th>
+                          <th style={{ width: isAllBills ? '11%' : '15%', textAlign: 'left' }}>Brand</th>
+                          <th style={{ width: isAllBills ? '11%' : '15%', textAlign: 'left' }}>Date</th>
+                          {isAllBills && <th style={{ width: '15%', textAlign: 'right' }}>Before Tax Invoice Value</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -1842,16 +2077,29 @@ const Reports = () => {
                                   <td style={{ textAlign: 'right', fontWeight: 700 }}>₹{balance.toLocaleString()}</td>
                                   <td>{inv.brand || '-'}</td>
                                   <td>{new Date(inv.dateOfInvoice || inv.date).toLocaleDateString()}</td>
+                                  {isAllBills && <td style={{ textAlign: 'right' }}>₹{(inv.invoiceValueBeforeTax || 0).toLocaleString()}</td>}
                                 </tr>
                               );
                             })}
                             <tr style={{ fontWeight: 800, background: '#f8fafc' }}>
                               <td>Total</td>
-                              {isAllBills && <td></td>}
-                              <td style={{ textAlign: 'right' }}>₹{printedTotalInvoiced.toLocaleString()}</td>
-                              <td></td>
-                              <td style={{ textAlign: 'right', color: '#b91c1c' }}>₹{printedTotalOutstanding.toLocaleString()}</td>
-                              <td colSpan="2"></td>
+                              {isAllBills ? (
+                                <>
+                                  <td></td>
+                                  <td style={{ textAlign: 'right' }}>₹{printedTotalInvoiced.toLocaleString()}</td>
+                                  <td></td>
+                                  <td style={{ textAlign: 'right', color: '#b91c1c' }}>₹{printedTotalOutstanding.toLocaleString()}</td>
+                                  <td colSpan="2"></td>
+                                  <td style={{ textAlign: 'right' }}>₹{printedTotalBeforeTax.toLocaleString()}</td>
+                                </>
+                              ) : (
+                                <>
+                                  <td style={{ textAlign: 'right' }}>₹{printedTotalInvoiced.toLocaleString()}</td>
+                                  <td></td>
+                                  <td style={{ textAlign: 'right', color: '#b91c1c' }}>₹{printedTotalOutstanding.toLocaleString()}</td>
+                                  <td colSpan="2"></td>
+                                </>
+                              )}
                             </tr>
                           </>
                         )}
